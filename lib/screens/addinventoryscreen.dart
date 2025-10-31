@@ -99,7 +99,9 @@ class _AddinventoryscreenState extends State<Addinventoryscreen> {
             backgroundColor: Color(0xFF4CAF50),
             duration: Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             margin: EdgeInsets.all(16),
           ),
         );
@@ -124,7 +126,9 @@ class _AddinventoryscreenState extends State<Addinventoryscreen> {
             backgroundColor: Color(0xFFFF9800),
             duration: Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             margin: EdgeInsets.all(16),
           ),
         );
