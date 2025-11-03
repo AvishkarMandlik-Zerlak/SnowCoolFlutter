@@ -10,11 +10,14 @@ class ChallanApi {
   ChallanApi({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   Future<bool> challanData(
+    int customerId,
     String customerName,
     String challanType,
     String location,
     String transporter,
-    String vehicleDriverDetails,
+    String vehicleNumber,
+    String driverName,
+    String driverNumber,
     String mobileNumber,
     String smallRegularQty,
     String smallRegularSrNo,
@@ -24,42 +27,87 @@ class ChallanApi {
     String bigRegularSrNo,
     String bigFloronQty,
     String bigFloronSrNo,
+    String date, // ADDED: Only this parameter
   ) async {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final url = Uri.parse('$normalizedBase/challanData');
-    final body = jsonEncode({
+    final url = Uri.parse('$normalizedBase/api/v1/challans/create');
+
+    // Parse numeric fields, defaulting to 0 if parsing fails
+    int parsedCustomerId = customerId;
+    int parseQty(String value) => int.tryParse(value) ?? 0;
+
+    // Build items list expected by backend. Ensure we always send an array
+    // (even if empty) so backend code that iterates items doesn't get NPE.
+    final List<Map<String, dynamic>> items = [];
+
+    final int sRegQty = parseQty(smallRegularQty);
+    if (sRegQty > 0 || (smallRegularSrNo.isNotEmpty)) {
+      items.add({
+        'product': 'SMALL_REGULAR',
+        'quantity': sRegQty,
+        'serialNumber': smallRegularSrNo,
+      });
+    }
+
+    final int sFlorQty = parseQty(smallFloronQty);
+    if (sFlorQty > 0 || (smallFloronSrNo.isNotEmpty)) {
+      items.add({
+        'product': 'SMALL_FLORON',
+        'quantity': sFlorQty,
+        'serialNumber': smallFloronSrNo,
+      });
+    }
+
+    final int bRegQty = parseQty(bigRegularQty);
+    if (bRegQty > 0 || (bigRegularSrNo.isNotEmpty)) {
+      items.add({
+        'product': 'BIG_REGULAR',
+        'quantity': bRegQty,
+        'serialNumber': bigRegularSrNo,
+      });
+    }
+
+    final int bFlorQty = parseQty(bigFloronQty);
+    if (bFlorQty > 0 || (bigFloronSrNo.isNotEmpty)) {
+      items.add({
+        'product': 'BIG_FLORON',
+        'quantity': bFlorQty,
+        'serialNumber': bigFloronSrNo,
+      });
+    }
+
+    // Parse mobile number into a digit-only string for customerPhoneNo
+    String parsePhone(String value) {
+      final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+      return digits;
+    }
+
+    final String customerPhoneNo = parsePhone(mobileNumber);
+
+    final requestObj = {
+      // DTO expects customerId (int) and customerName
+      'customerId': parsedCustomerId,
       'customerName': customerName,
       'challanType': challanType,
-      'location': location,
+      // DTO property names
+      'siteLocation': location,
       'transporter': transporter,
-      'vehicleDriverDetails': vehicleDriverDetails,
-      'mobileNumber': mobileNumber,
-      'smallRegularQty': smallRegularQty,
-      'smallRegularSrNo': smallRegularSrNo,
-      'smallFloronQty': smallFloronQty,
-      'smallFloronSrNo': smallFloronSrNo,
-      'bigRegularQty': bigRegularQty,
-      'bigRegularSrNo': bigRegularSrNo,
-      'bigFloronQty': bigFloronQty,
-      'bigFloronSrNo': bigFloronSrNo,
-    });
+      'vehicleNumber': vehicleNumber,
+      'driverName': driverName,
+      'driverNumber': driverNumber,
+      // Map phone to DTO.contactNumber
+      'contactNumber': customerPhoneNo,
+      'items': items, // always present
+      'date': date, // ADDED: Send date
+    };
 
-    log(customerName);
-    log(challanType);
-    log(location);
-    log(transporter);
-    log(vehicleDriverDetails);
-    log(mobileNumber);
-    log(smallRegularQty);
-    log(smallRegularSrNo);
-    log(smallFloronQty);
-    log(smallFloronSrNo);
-    log(bigRegularQty);
-    log(bigRegularSrNo);
-    log(bigFloronQty);
-    log(bigFloronSrNo);
+    // Log the complete request object in a readable format
+    log('Challan Save Request:');
+    log(const JsonEncoder.withIndent('  ').convert(requestObj));
+
+    final body = jsonEncode(requestObj);
 
     // Get authenticated headers
     final headers = ApiUtils.getAuthenticatedHeaders();
@@ -72,21 +120,22 @@ class ChallanApi {
           .timeout(const Duration(seconds: 10));
 
       // Print response for debugging
-      log('challanApi: status=${resp.statusCode}');
-      log('challanApi: response=${resp.body}');
+      log('ChallanApi Response Status: ${resp.statusCode}');
+      log('ChallanApi Response Body:');
+      try {
+        // Try to format the response JSON if it's valid JSON
+        final respJson = jsonDecode(resp.body);
+        log(const JsonEncoder.withIndent('  ').convert(respJson));
+      } catch (e) {
+        // If not valid JSON, print as is
+        log(resp.body);
+      }
 
-      if (resp.statusCode == 200) {
-        try {
-          final Map<String, dynamic> jsonResp = jsonDecode(resp.body);
-          // Accept either explicit success flag or presence of token
-          if (jsonResp['success'] == true) return true;
-          if (jsonResp['token'] != null) return true;
-          return false;
-        } catch (e) {
-          // Could not parse JSON — log and treat as failure
-          log('ChallanApi: JSON decode error: $e');
-          return false;
-        }
+      // Treat any 2xx response as success. Many APIs return the created
+      // entity (not a {"success":true} envelope) which previously made
+      // the client conclude failure.
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        return true;
       } else if (resp.statusCode == 401) {
         log('ChallanApi: 401 Unauthorized - Missing or invalid token');
         return false;

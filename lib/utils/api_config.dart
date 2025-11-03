@@ -9,7 +9,7 @@ class ApiConfig {
   // Use localhost:8080 by default; change to 10.0.2.2 when running on Android
   // emulator, or set to your machine LAN IP for physical devices.
   static String baseUrl = 'http://localhost:8081';
-
+  
   /// Helper to set the base URL at runtime.
   static void setBaseUrl(String url) => baseUrl = url;
 }
