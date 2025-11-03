@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/addinventoryscreen.dart';
+import 'package:snow_trading_cool/screens/view_challan.dart';
 import 'challan_screen.dart';
 import 'create_customer_screen.dart';
 import 'login_screen.dart';
@@ -230,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (_) =>
-                                                const ChallanScreen(),
+                                                ViewChallanScreen(),
                                           ),
                                         );
                                       },

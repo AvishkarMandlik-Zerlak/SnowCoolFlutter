@@ -469,7 +469,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       label: "Date",
                       controller: dateController,
                       hint: "Auto-filled (yyyy-MM-dd)",
-                      enabled: false,
+                      enabled: true,
                     ),
                     const SizedBox(height: 16),
                     _buildProductTable(), // Dynamic now
@@ -578,7 +578,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
     return Container(
       decoration: BoxDecoration(border: Border.all(color: const Color.fromRGBO(238, 238, 238, 1)), borderRadius: BorderRadius.circular(8)),
       child: Table(
-        columnWidths: const {0: FlexColumnWidth(2.5), 1: FlexColumnWidth(1.5), 2: FlexColumnWidth(1.5)},
+        columnWidths: const {0: FlexColumnWidth(0.7), 1: FlexColumnWidth(0.5),},
         children: [
           TableRow(
             decoration: const BoxDecoration(color: Color.fromRGBO(238, 238, 238, 1), borderRadius: BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8))),
