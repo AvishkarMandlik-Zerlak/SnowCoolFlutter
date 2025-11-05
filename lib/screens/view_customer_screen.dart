@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
-import 'package:snow_trading_cool/screens/customer_store.dart';
+import 'package:snow_trading_cool/services/customer_store_api.dart';
 import 'package:snow_trading_cool/screens/view_customer_screennew.dart';
 import '../services/customer_api.dart';
 
