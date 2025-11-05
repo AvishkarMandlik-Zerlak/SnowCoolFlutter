@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:snow_trading_cool/screens/setting_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart';
-import '../services/profile_api.dart'; // Assume this handles fetch/update API
-
+import '../services/profile_api.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,7 +14,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isLoading = true;
-  Map<String, dynamic> _profileData = {}; // {name, email, phone, address, company}
+  Map<String, dynamic> _profileData = {};
   final ProfileApi _profileApi = ProfileApi();
 
   @override
@@ -24,13 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      // Token line hata diya - ApiUtils handle karega
-      final response = await _profileApi.getProfile(); // No token
+      final response = await _profileApi.getProfile();
 
       if (response.success && response.data != null) {
         setState(() {
@@ -38,9 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading = false;
         });
       } else {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -51,9 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
@@ -63,13 +55,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _updateProfile() async {
-    // TODO: Implement update logic similar to create
-    // For now, just toggle edit mode
-    setState(() {
-      _isEditing = !_isEditing;
-    });
-    if (_isEditing) {
-      // Save changes here
+    setState(() => _isEditing = !_isEditing);
+    if (!_isEditing) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green),
       );
@@ -86,14 +73,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _navigateToSettings() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const UserCreateScreen()),
+      MaterialPageRoute(builder: (context) => const ProfileApplicationSettingScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (_isLoading) {
       return const Scaffold(
@@ -117,13 +103,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: Colors.white),
-            onPressed: _navigateToUserCreate, // User Create icon
+            icon: const Icon(Icons.add, color: Colors.white),
+            onPressed: _navigateToUserCreate,
             tooltip: 'Create User',
           ),
           IconButton(
-            icon: Icon(Icons.settings, color: Colors.white),
-            onPressed: _navigateToSettings, // Settings icon
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: _navigateToSettings,
             tooltip: 'Settings',
           ),
           IconButton(
@@ -132,46 +118,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 16),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Profile Avatar
-              Center(
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey.shade300,
-                  child: Icon(
-                    Icons.person,
-                    size: 50,
-                    color: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 16),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Center(
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey.shade300,
+                    child: const Icon(Icons.person, size: 50, color: Colors.white),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              // Name
-              _buildProfileField('Full Name', _profileData['name'] ?? '', Icons.person, _isEditing),
-              const SizedBox(height: 16),
-              // Email
-              _buildProfileField('Email', _profileData['email'] ?? '', Icons.email, _isEditing),
-              const SizedBox(height: 16),
-              // Phone
-              _buildProfileField('Phone', _profileData['phone'] ?? '', Icons.phone, _isEditing),
-              const SizedBox(height: 16),
-              // Address
-              _buildProfileField('Address', _profileData['address'] ?? '', Icons.location_on, _isEditing, isMultiLine: true),
-              const SizedBox(height: 16),
-              // Company
-              _buildProfileField('Company', _profileData['company'] ?? '', Icons.business, _isEditing),
-            ],
+                const SizedBox(height: 24),
+                _buildProfileField('Full Name', _profileData['name'] ?? '', Icons.person),
+                const SizedBox(height: 16),
+                _buildProfileField('Email', _profileData['email'] ?? '', Icons.email),
+                const SizedBox(height: 16),
+                _buildProfileField('Phone', _profileData['phone'] ?? '', Icons.phone),
+                const SizedBox(height: 16),
+                _buildProfileField('Address', _profileData['address'] ?? '', Icons.location_on, isMultiLine: true),
+                const SizedBox(height: 16),
+                _buildProfileField('Company', _profileData['company'] ?? '', Icons.business),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileField(String label, String value, IconData icon, bool isEditing, {bool isMultiLine = false}) {
+  Widget _buildProfileField(String label, String value, IconData icon, {bool isMultiLine = false}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -186,36 +164,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (isEditing)
-              TextFormField(
-                initialValue: value,
-                maxLines: isMultiLine ? 3 : 1,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                style: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
-                onChanged: (newValue) {
-                  // TODO: Update _profileData here
-                },
-              )
-            else
-              Text(
-                value.isEmpty ? 'Not set' : value,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: value.isEmpty ? Colors.grey : Colors.black87,
-                ),
-              ),
+            _isEditing
+                ? TextFormField(
+                    initialValue: value,
+                    maxLines: isMultiLine ? 3 : 1,
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    style: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
+                    onChanged: (newValue) {
+                      _profileData[label.toLowerCase()] = newValue;
+                    },
+                  )
+                : Text(
+                    value.isEmpty ? 'Not set' : value,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: value.isEmpty ? Colors.grey : Colors.black87,
+                    ),
+                  ),
           ],
         ),
       ),
