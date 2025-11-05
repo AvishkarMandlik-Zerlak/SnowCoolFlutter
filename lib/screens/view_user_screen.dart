@@ -164,7 +164,7 @@ class _UserViewScreenState extends State<UserViewScreen> {
   void _navigateToAddUser() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const UserCreateScreen()),
+      MaterialPageRoute(builder: (context) => const UserCreateScreen(user: null,)),
     ).then((_) => _loadUsers()); // Refresh list after add
   }
 
@@ -310,11 +310,30 @@ class _UserViewScreenState extends State<UserViewScreen> {
                       color: Colors.black87,
                     ),
                   ),
-                  Switch(
-                    value: user.active,
-                    onChanged: (value) => _toggleUserStatus(user),
-                    activeColor: const Color.fromRGBO(0, 140, 192, 1),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Compact switch
+                  GestureDetector(
+                    onTap: () => _toggleUserStatus(user),
+                    child: Container(
+                      width: 60,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: user.active ? Colors.green : Colors.red,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: user.active ? Colors.green[700]! : Colors.red[700]!,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.active ? 'ON' : 'OFF',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

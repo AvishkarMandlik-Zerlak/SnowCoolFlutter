@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:snow_trading_cool/models/user_model.dart';
 import '../services/user_api.dart'; // Assume you have this for user create API (similar to profile_api)
 
 class UserCreateScreen extends StatefulWidget {
-  const UserCreateScreen({super.key});
+  final User? user;
+  const UserCreateScreen({super.key, this.user});
 
   @override
   State<UserCreateScreen> createState() => _UserCreateScreenState();

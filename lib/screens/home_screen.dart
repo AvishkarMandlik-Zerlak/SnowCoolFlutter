@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/addinventoryscreen.dart';
 import 'package:snow_trading_cool/screens/profile_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart'; // Import for User Create
+import 'package:snow_trading_cool/screens/view_customer_screen.dart'; // Changed import to ViewCustomerScreen
+import 'package:snow_trading_cool/screens/view_customer_screennew.dart';
 import 'package:snow_trading_cool/screens/view_user_screen.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/services/profile_api.dart'; // Import for profile check
@@ -22,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final LogoutApi _logoutApi = LogoutApi();
   bool _isLoggingOut = false;
+  bool _showCustomerSubMenu = false;
 
   Future<void> _handleLogout() async {
     setState(() {
@@ -255,19 +258,45 @@ class _HomeScreenState extends State<HomeScreen> {
                                         );
                                       },
                                     ),
+
                                     const Divider(height: 1),
                                     ListTile(
-                                      title: const Text('Customer'),
-                                      trailing: const Icon(Icons.add),
+                                      title: const Text('Customers'),
+                                      trailing: Icon(_showCustomerSubMenu ? Icons.remove : Icons.add),
                                       onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const CreateCustomerScreen(),
-                                          ),
-                                        );
+                                        setState(() {
+                                          _showCustomerSubMenu = !_showCustomerSubMenu;
+                                        });
                                       },
                                     ),
+                                    if (_showCustomerSubMenu) ...[
+                                      ListTile(
+                                        title: const Text('Create Customer'),
+                                        leading: const SizedBox(width: 24), // Indent
+                                        trailing: const Icon(Icons.add),
+                                        onTap: () {
+                                          Navigator.of(ctx).pop(); // Close the drawer
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => const CreateCustomerScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      ListTile(
+                                        title: const Text('View Customers'),
+                                        leading: const SizedBox(width: 24), // Indent
+                                        trailing: const Icon(Icons.add),
+                                        onTap: () {
+                                          Navigator.of(ctx).pop(); // Close the drawer
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => const ViewCustomerScreenFixed(), // Changed to ViewCustomerScreen
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
                                     const Divider(height: 1),
                                     ListTile(
                                       title: const Text('Items/Goods'),
@@ -588,10 +617,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: 'view_customer',
+                value: 'customers',
                 child: ListTile(
                   leading: const Icon(Icons.person),
-                  title: const Text('View Customer'),
+                  title: const Text('Customers'),
                 ),
               ),
               PopupMenuItem(
@@ -612,7 +641,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return;
           }
 
-          if (selected == 'view_customer') {
+          if (selected == 'customers') {
             final sub = await showMenu<String>(
               context: context,
               position: RelativeRect.fromLTRB(left, top - 120, 16, 16),
@@ -621,11 +650,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   value: 'create_customer',
                   child: Text('Create Customer'),
                 ),
+                const PopupMenuItem(
+                  value: 'view_customers',
+                  child: Text('View Customers'),
+                ),
               ],
             );
             if (sub == 'create_customer') {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CreateCustomerScreen()),
+              );
+            }
+            if (sub == 'view_customers') {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ViewCustomerScreenFixed()), // Changed to ViewCustomerScreenFixed
               );
             }
             return;
