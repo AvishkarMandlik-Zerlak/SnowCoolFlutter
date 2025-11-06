@@ -7,7 +7,6 @@ import 'package:snow_trading_cool/screens/view_user_screen.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/services/profile_api.dart'; // Import for profile check
 import 'package:snow_trading_cool/screens/view_challan.dart';
-import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import 'challan_screen.dart';
 import 'create_customer_screen.dart';
 import 'login_screen.dart';
@@ -33,23 +32,21 @@ class _HomeScreenState extends State<HomeScreen> {
       // Get the stored token and call logout API
       final token = TokenManager().getToken();
       print('Using token for logout: $token');
-
       final response = await _logoutApi.logout(token);
 
       // Clear the stored token regardless of API response
       TokenManager().clearToken();
 
-      // Show appropriate toast based on API response
+      // Show appropriate message based on response
       if (mounted) {
-        if (response.success) {
-          showSuccessToast(
-            context,
-            response.message ?? 'Logged out successfully ✅',
-          );
-        } else {
-          showWarningToast(context, response.message ?? 'Logout incomplete ⚠️');
-        }
-
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message ?? 'Logged out successfully'),
+            backgroundColor: response.success ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        
         // Always navigate to login for security (whether API succeeded or not)
         Navigator.pushAndRemoveUntil(
           context,
@@ -65,7 +62,13 @@ class _HomeScreenState extends State<HomeScreen> {
       TokenManager().clearToken();
 
       if (mounted) {
-        showErrorToast(context, "Logout failed due to network error ❌");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Logged out locally due to network error'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
 
         // Always navigate to login for security
         Navigator.pushAndRemoveUntil(
@@ -79,15 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handleProfile() async {
     final bool hasProfile = await _checkProfileExists();
-
+    
     if (hasProfile) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
     } else {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      );
     }
   }
 
@@ -220,16 +223,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: SlideTransition(
-                          position:
-                              Tween<Offset>(
-                                begin: const Offset(-1.0, 0.0),
-                                end: Offset.zero,
-                              ).animate(
-                                CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
-                                ),
-                              ),
+                          position: Tween<Offset>(
+                            begin: const Offset(-1.0, 0.0),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
                           child: Material(
                             color: Colors.white,
                             elevation: 4,
@@ -248,8 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Navigator.of(ctx).pop();
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) =>
-                                                const ChallanScreen(),
+                                            builder: (_) => const ChallanScreen(),
                                           ),
                                         );
                                       },
@@ -262,8 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Navigator.of(ctx).pop();
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) =>
-                                                const CreateCustomerScreen(),
+                                            builder: (_) => const CreateCustomerScreen(),
                                           ),
                                         );
                                       },
@@ -276,8 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Navigator.of(ctx).pop();
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) =>
-                                                const Addinventoryscreen(),
+                                            builder: (_) => const Addinventoryscreen(),
                                           ),
                                         );
                                       },
@@ -395,12 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: Border.all(color: const Color(0xFFF0D0D0), width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color.fromRGBO(
-                      255,
-                      228,
-                      228,
-                      1,
-                    ).withOpacity(0.3),
+                    color: const Color.fromRGBO(255, 228, 228, 1).withOpacity(0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -443,12 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: Border.all(color: const Color(0xFFF0D0D0), width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color.fromRGBO(
-                      255,
-                      228,
-                      228,
-                      1,
-                    ).withOpacity(0.3),
+                    color: const Color.fromRGBO(255, 228, 228, 1).withOpacity(0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -617,9 +606,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (selected == null) return;
           if (selected == 'challan') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ViewChallanScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ViewChallanScreen()));
             return;
           }
 
