@@ -7,7 +7,6 @@ import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/profile_api.dart'; // Assume this handles fetch/update API
 import 'user_create_screen.dart'; // Import for User Create navigation
 
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -18,8 +17,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   bool _isLoading = true;
-  Map<String, dynamic> _profileData = {}; // {name, email, phone, address, company, photoUrl?}
-  File? _selectedImage; // Selected image file for upload/edit
+  Map<String, dynamic> _profileData = {};
   final ProfileApi _profileApi = ProfileApi();
   final ImagePicker _picker = ImagePicker();
 
@@ -30,13 +28,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      // Token line hata diya - ApiUtils handle karega
-      final response = await _profileApi.getProfile(); // No token
+      final response = await _profileApi.getProfile();
 
       if (response.success && response.data != null) {
         setState(() {
@@ -44,9 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading = false;
         });
       } else {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         if (mounted) {
           showWarningToast(context, "Profile not found. Please create one.");
         }
@@ -115,9 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       if (mounted) {
         showErrorToast(context, "Upload error: $e");
       }
@@ -152,8 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (_isLoading) {
       return const Scaffold(
@@ -185,12 +174,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: _navigateToUserCreate, // User Create icon
+            onPressed: _navigateToUserCreate,
             tooltip: 'Create User',
           ),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: _navigateToSettings, // Settings icon
+            onPressed: _navigateToSettings,
             tooltip: 'Settings',
           ),
           IconButton(
@@ -199,62 +188,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 16),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Profile Avatar with upload/edit
-              Stack(
-                children: [
-                  GestureDetector(
-                    onTap: _pickImage, // Tap to upload
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey.shade300,
-                      child: avatarContent,
-                    ),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 16),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Center(
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey.shade300,
+                    child: const Icon(Icons.person, size: 50, color: Colors.white),
                   ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _editImage, // Edit icon for photo edit
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // Name
-              _buildProfileField('Full Name', _profileData['name'] ?? '', Icons.person, _isEditing),
-              const SizedBox(height: 16),
-              // Email
-              _buildProfileField('Email', _profileData['email'] ?? '', Icons.email, _isEditing),
-              const SizedBox(height: 16),
-              // Phone
-              _buildProfileField('Phone', _profileData['phone'] ?? '', Icons.phone, _isEditing),
-              const SizedBox(height: 16),
-              // Address
-              _buildProfileField('Address', _profileData['address'] ?? '', Icons.location_on, _isEditing, isMultiLine: true),
-              const SizedBox(height: 16),
-              // Company
-              _buildProfileField('Company', _profileData['company'] ?? '', Icons.business, _isEditing),
-            ],
+                ),
+                const SizedBox(height: 24),
+                _buildProfileField('Full Name', _profileData['name'] ?? '', Icons.person),
+                const SizedBox(height: 16),
+                _buildProfileField('Email', _profileData['email'] ?? '', Icons.email),
+                const SizedBox(height: 16),
+                _buildProfileField('Phone', _profileData['phone'] ?? '', Icons.phone),
+                const SizedBox(height: 16),
+                _buildProfileField('Address', _profileData['address'] ?? '', Icons.location_on, isMultiLine: true),
+                const SizedBox(height: 16),
+                _buildProfileField('Company', _profileData['company'] ?? '', Icons.business),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileField(String label, String value, IconData icon, bool isEditing, {bool isMultiLine = false}) {
+  Widget _buildProfileField(String label, String value, IconData icon, {bool isMultiLine = false}) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -269,36 +234,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (isEditing)
-              TextFormField(
-                initialValue: value,
-                maxLines: isMultiLine ? 3 : 1,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                style: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
-                onChanged: (newValue) {
-                  // TODO: Update _profileData here
-                },
-              )
-            else
-              Text(
-                value.isEmpty ? 'Not set' : value,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: value.isEmpty ? Colors.grey : Colors.black87,
-                ),
-              ),
+            _isEditing
+                ? TextFormField(
+                    initialValue: value,
+                    maxLines: isMultiLine ? 3 : 1,
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    style: GoogleFonts.inter(fontSize: 16, color: Colors.black87),
+                    onChanged: (newValue) {
+                      _profileData[label.toLowerCase()] = newValue;
+                    },
+                  )
+                : Text(
+                    value.isEmpty ? 'Not set' : value,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: value.isEmpty ? Colors.grey : Colors.black87,
+                    ),
+                  ),
           ],
         ),
       ),

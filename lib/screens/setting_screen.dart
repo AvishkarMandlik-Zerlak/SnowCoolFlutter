@@ -1,439 +1,354 @@
-import 'dart:io';
+// setting_screen.dart
+import 'dart:convert';
+import 'dart:io' show File if (dart.library.io) 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/application_settings_api.dart';
+import '../utils/token_manager.dart';
 
 class ProfileApplicationSettingScreen extends StatefulWidget {
   const ProfileApplicationSettingScreen({super.key});
 
   @override
-  State<ProfileApplicationSettingScreen> createState() =>
-      _ProfileApplicationSettingScreenState();
+  State<ProfileApplicationSettingScreen> createState() => _ProfileApplicationSettingScreenState();
 }
 
-class _ProfileApplicationSettingScreenState
-    extends State<ProfileApplicationSettingScreen> {
-  File? _logoFile;
-  File? _signatureFile;
-  final picker = ImagePicker();
+class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSettingScreen> {
+  final ImagePicker picker = ImagePicker();
+  bool _isLoading = false;
+  bool _isExisting = false;
 
-  final TextEditingController _invoicePrefixController =
-      TextEditingController();
-  final TextEditingController _challanFormatController =
-      TextEditingController();
-  final TextEditingController _challanSequenceController =
-      TextEditingController(text: "1");
+  XFile? _logoXFile;
+  XFile? _signatureXFile;
+
+  String? _logoBase64;
+  String? _signatureBase64;
+
+  final TextEditingController _invoicePrefixController = TextEditingController();
+  final TextEditingController _challanFormatController = TextEditingController();
+  final TextEditingController _challanSequenceController = TextEditingController(text: "1");
   final TextEditingController _termsController = TextEditingController();
 
-  Future<void> _pickImage(bool isLogo) async {
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        if (isLogo) {
-          _logoFile = File(pickedFile.path);
-        } else {
-          _signatureFile = File(pickedFile.path);
-        }
-      });
+  ApplicationSettingsApi? _api;
+
+  @override
+  void initState() {
+    super.initState();
+    _initApi();
+  }
+
+  Future<void> _initApi() async {
+    setState(() => _isLoading = true);
+    final token = TokenManager().getToken();
+
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("User not authenticated! Please log in again.")),
+        );
+        Navigator.pop(context);
+      }
+      return;
+    }
+
+    setState(() => _api = ApplicationSettingsApi(token: token));
+    await _fetchSettings();
+  }
+
+  Future<void> _fetchSettings() async {
+    if (_api == null) return;
+    setState(() => _isLoading = true);
+    try {
+      final settings = await _api!.getSettings();
+      if (settings != null) {
+        setState(() {
+          _isExisting = true;
+          _invoicePrefixController.text = settings.invoicePrefix ?? "";
+          _challanFormatController.text = settings.challanNumberFormat ?? "";
+          _challanSequenceController.text = (settings.challanSequence ?? 1).toString();
+          _termsController.text = settings.termsAndConditions ?? "";
+
+          _logoXFile = null;
+          _signatureXFile = null;
+
+          _logoBase64 = settings.logoBase64;
+          _signatureBase64 = settings.signatureBase64;
+        });
+      } else {
+        setState(() {
+          _isExisting = false;
+          _logoBase64 = null;
+          _signatureBase64 = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to load settings: $e")));
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  void _resetSequence() {
+  Future<void> _pickImage(bool isLogo) async {
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile == null) return;
+
+    final bytes = kIsWeb
+        ? await pickedFile.readAsBytes()
+        : await File(pickedFile.path).readAsBytes();
+
+    final base64Str = base64Encode(bytes);
+
     setState(() {
-      _challanSequenceController.text = "1";
+      if (isLogo) {
+        _logoXFile = pickedFile;
+        _logoBase64 = base64Str;
+      } else {
+        _signatureXFile = pickedFile;
+        _signatureBase64 = base64Str;
+      }
     });
+  }
+
+  void _resetSequence() {
+    setState(() => _challanSequenceController.text = "1");
+  }
+
+  // ---------- Safe Image Decoders ----------
+  Widget _buildLogoImage() {
+    if (_logoBase64 == null || _logoBase64!.isEmpty) {
+      return const Icon(Icons.add_a_photo, size: 40, color: Colors.grey);
+    }
+
+    try {
+      final bytes = base64Decode(_logoBase64!);
+      return CircleAvatar(radius: 50, backgroundImage: MemoryImage(bytes));
+    } catch (e) {
+      return const Icon(Icons.broken_image, size: 40, color: Colors.red);
+    }
+  }
+
+  DecorationImage? _buildSignatureImage() {
+    if (_signatureBase64 == null || _signatureBase64!.isEmpty) return null;
+
+    try {
+      final bytes = base64Decode(_signatureBase64!);
+      return DecorationImage(image: MemoryImage(bytes), fit: BoxFit.contain);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    if (_api == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not authenticated")));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final dto = ApplicationSettingsDTO(
+        logoBase64: _logoBase64,
+        signatureBase64: _signatureBase64,
+        invoicePrefix: _invoicePrefixController.text,
+        challanNumberFormat: _challanFormatController.text,
+        challanSequence: int.tryParse(_challanSequenceController.text) ?? 1,
+        termsAndConditions: _termsController.text,
+      );
+
+      ApplicationSettingsDTO? result;
+      if (_isExisting) {
+        result = await _api!.updateSettings(dto);
+      } else {
+        result = await _api!.createSettings(dto);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isExisting ? "Settings Updated Successfully" : "Settings Created Successfully"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      await _fetchSettings();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _invoicePrefixController.dispose();
+    _challanFormatController.dispose();
+    _challanSequenceController.dispose();
+    _termsController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    const blueColor = Color.fromRGBO(0, 140, 192, 1);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text("Application Settings"),
-        titleTextStyle: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: const Color.fromRGBO(0, 140, 192, 1),
-        ),
-        backgroundColor: Colors.white, // backgroundColor: Colors.blue,
+        titleTextStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            Expanded(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Logo Section ---
-                  Text(
-                    "Logo",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                  ),
-                  // const SizedBox(height: 8),
+                  _buildLabel("Logo"),
+                  const SizedBox(height: 8),
                   Center(
                     child: GestureDetector(
                       onTap: () => _pickImage(true),
                       child: CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.grey[200],
-                        backgroundImage: _logoFile != null
-                            ? FileImage(_logoFile!)
-                            : null,
-                        child: _logoFile == null
-                            ? const Icon(
-                                Icons.add_a_photo,
-                                size: 40,
-                                color: Colors.grey,
-                              )
-                            : null,
+                        child: _buildLogoImage(),
                       ),
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // --- Invoice Prefix ---
-                  Text(
-                    "Invoice Prefix",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                  ),
-                  TextField(
-                    controller: _invoicePrefixController,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 14,
-                      ),
-                      hintText: "e.g., INV-",
-                      hintStyle: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color.fromRGBO(156, 156, 156, 1),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+                  _buildLabel("Invoice Prefix"),
+                  _buildTextField(_invoicePrefixController, "e.g., INV-"),
                   const SizedBox(height: 16),
 
-                  // --- Challan Number Format ---
-                  Text(
-                    "Challan Number Formater",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                  ),
-                  TextField(
-                    controller: _challanFormatController,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 14,
-                      ),
-                      hintText: "e.g., 0001",
-                      hintStyle: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color.fromRGBO(156, 156, 156, 1),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+                  _buildLabel("Challan Number Format"),
+                  _buildTextField(_challanFormatController, "e.g., CH-YYYY-0001"),
                   const SizedBox(height: 16),
 
-                  // --- Challan Sequence ---
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Challan Sequence",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color.fromRGBO(20, 20, 20, 1),
-                              ),
-                            ),
-                            TextField(
-                              controller: _challanSequenceController,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color.fromRGBO(20, 20, 20, 1),
-                              ),
-                              decoration: InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: 10,
-                                  horizontal: 14,
-                                ),
-                                hintText: "e.g., 1",
-                                hintStyle: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color.fromRGBO(156, 156, 156, 1),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderSide: const BorderSide(
-                                    color: Color.fromRGBO(156, 156, 156, 1),
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: const BorderSide(
-                                    color: Color.fromRGBO(156, 156, 156, 1),
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
+                            _buildLabel("Challan Sequence"),
+                            _buildTextField(_challanSequenceController, "e.g., 1"),
                           ],
                         ),
                       ),
                       const SizedBox(width: 10),
-
-                      Column(
-                        children: [
-                          SizedBox(height: 20),
-                          GestureDetector(
-                            onTap: _resetSequence,
-                            child: Container(
-                              width: 100,
-                              height: 35,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: const Color.fromRGBO(0, 140, 192, 1),
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  "Reset",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color.fromRGBO(0, 140, 192, 1),
-                                  ),
-                                ),
-                              ),
+                      GestureDetector(
+                        onTap: _resetSequence,
+                        child: Container(
+                          width: 100,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: blueColor, width: 2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              "Reset",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  // --- Terms and Conditions ---
-                  Text(
-                    "Terms & Conditions",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                  ),
-                  TextField(
-                    controller: _termsController,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(20, 20, 20, 1),
-                    ),
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 14,
-                      ),
-                      hintText: "e.g.,",
-                      hintStyle: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color.fromRGBO(156, 156, 156, 1),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(
-                          color: Color.fromRGBO(156, 156, 156, 1),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+                  _buildLabel("Terms & Conditions"),
+                  _buildTextField(_termsController, "e.g.,", maxLines: 3),
                   const SizedBox(height: 20),
 
-                  // --- Signature Upload ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 20,
-                    children: [
-                      const Text(
-                        "Upload Signature",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromRGBO(20, 20, 20, 1),
-                        ),
+                  _buildLabel("Upload Signature"),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _pickImage(false),
+                    child: Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                        ],
+                        image: _buildSignatureImage(),
                       ),
-                      GestureDetector(
-                        onTap: () => _pickImage(false),
-                        child: Container(
-                          height: 100,
-                          // width: 280,
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withValues(alpha: 0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                            border: Border.all(
-                              color: Colors.grey.shade400,
-                              style: BorderStyle.solid,
-                              width: 1.5,
-                            ),
-                            image: _signatureFile != null
-                                ? DecorationImage(
-                                    image: FileImage(_signatureFile!),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          child: _signatureFile == null
-                              ? Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.upload_file_rounded,
-                                      size: 40,
-                                      color: Colors.blueGrey.shade400,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      "Tap to upload signature",
-                                      style: TextStyle(
-                                        color: Colors.blueGrey.shade600,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Stack(
-                                  children: [
-                                    Positioned(
-                                      right: 8,
-                                      top: 8,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(4.0),
-                                          child: Icon(
-                                            Icons.edit,
-                                            size: 18,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                      child: _signatureBase64 == null
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.upload_file_rounded, size: 40, color: Colors.blueGrey.shade400),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Tap to upload signature",
+                                  style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14, fontWeight: FontWeight.w500),
                                 ),
-                        ),
+                              ],
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: _saveSettings,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: blueColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                    ],
+                      child: Text(
+                        _isExisting ? "Update" : "Save",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            // --- Save Button ---
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Settings Saved Successfully"),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color.fromRGBO(0, 140, 192, 1),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  "Save",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    );
+  }
+
+  Widget _buildLabel(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color.fromRGBO(20, 20, 20, 1)),
+        ),
+      );
+
+  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color.fromRGBO(20, 20, 20, 1)),
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color.fromRGBO(156, 156, 156, 1)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color.fromRGBO(156, 156, 156, 1)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color.fromRGBO(0, 140, 192, 1)),
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     );
