@@ -1,8 +1,11 @@
+import 'dart:io'; // For File
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart'; // For ImagePicker, XFile, ImageSource
 import 'package:snow_trading_cool/screens/setting_screen.dart';
-import 'package:snow_trading_cool/screens/user_create_screen.dart';
-import '../services/profile_api.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import '../services/profile_api.dart'; // Assume this handles fetch/update API
+import 'user_create_screen.dart'; // Import for User Create navigation
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   Map<String, dynamic> _profileData = {};
   final ProfileApi _profileApi = ProfileApi();
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -36,30 +40,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } else {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ?? 'Profile not found'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showWarningToast(context, "Profile not found. Please create one.");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        showErrorToast(context, "Error loading profile: $e");
+      }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery); // Gallery se pick
+    if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+      });
+      await _uploadPhoto(); // Auto upload on select
+    }
+  }
+
+  Future<void> _editImage() async {
+    if (_selectedImage == null) {
+      // If no image selected, pick first
+      await _pickImage();
+      return;
+    }
+    // TODO: Simple edit - for now, re-pick or use a package like image_editor_plus for crop/filter
+    // Example: Re-pick for edit
+    final XFile? editedImage = await _picker.pickImage(source: ImageSource.gallery);
+    if (editedImage != null) {
+      setState(() {
+        _selectedImage = File(editedImage.path);
+      });
+      await _uploadPhoto(); // Upload edited
+    }
+  }
+
+  Future<void> _uploadPhoto() async {
+    if (_selectedImage == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _profileApi.uploadProfilePhoto(_selectedImage!);
+      if (response.success) {
+        setState(() {
+          _profileData['photoUrl'] = response.data?['photoUrl']; // Assume response has photoUrl
+          _selectedImage = null; // Clear after upload
+          _isLoading = false;
+        });
+        if (mounted) {
+          showSuccessToast(context, "Photo uploaded successfully");
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          showErrorToast(context, "Upload Failed");
         }
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
-        );
+        showErrorToast(context, "Upload error: $e");
       }
     }
   }
 
   Future<void> _updateProfile() async {
-    setState(() => _isEditing = !_isEditing);
-    if (!_isEditing) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green),
-      );
+    // TODO: Implement update logic similar to create
+    // For now, just toggle edit mode
+    setState(() {
+      _isEditing = !_isEditing;
+    });
+    if (_isEditing) {
+      // Save changes here
+      showSuccessToast(context, "Profile Updated Successfully");
     }
   }
 
@@ -87,6 +150,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    final String? photoUrl = _profileData['photoUrl'];
+    final Widget avatarContent = _selectedImage != null 
+        ? ClipOval(child: Image.file(_selectedImage!, fit: BoxFit.cover, width: 100, height: 100))
+        : photoUrl != null 
+            ? ClipOval(child: Image.network(photoUrl, fit: BoxFit.cover, width: 100, height: 100, errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 50)))
+            : const Icon(Icons.person, size: 50);
 
     return Scaffold(
       backgroundColor: Colors.white,

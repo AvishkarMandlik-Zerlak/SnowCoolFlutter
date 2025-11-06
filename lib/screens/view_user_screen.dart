@@ -41,12 +41,7 @@ class _UserViewScreenState extends State<UserViewScreen> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading users: $e (using demo data)'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        showWarningToast(context, "Error loading users, using demo data.");
       }
     }
   }
@@ -67,18 +62,12 @@ class _UserViewScreenState extends State<UserViewScreen> {
         setState(() {
           user.active = isActive;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User status updated successfully!'), backgroundColor: Colors.green),
-        );
+          showSuccessToast(context, "User status updated successfully!");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message ?? 'Failed to update status'), backgroundColor: Colors.red),
-        );
+        showErrorToast(context, response.message ?? 'Failed to update status');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e'), backgroundColor: Colors.red),
-      );
+      showErrorToast(context, "Error updating status: $e");
     }
   }
 
@@ -119,19 +108,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   setState(() {
                     _users.remove(user);
                   });
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('User deleted successfully!'), backgroundColor: Colors.green),
-                  );
                 } else {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(content: Text(response.message ?? 'Failed to delete user'), backgroundColor: Colors.red),
-                  );
+                  showErrorToast(context, response.message ?? 'Failed to delete user');
                 }
               } catch (e) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(content: Text('Error deleting user: $e'), backgroundColor: Colors.red),
-                );
+                showErrorToast(context, "Error deleting user: $e");
               }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),

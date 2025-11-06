@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 
 
 class CreateCustomerScreen extends StatefulWidget {
@@ -24,9 +25,7 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
     final name = _nameController.text.trim();
     final mobile = _mobileController.text.trim();
     if (name.isEmpty || mobile.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill name and mobile')),
-      );
+      showErrorToast(context, "Please fill name and mobile");
       return;
     }
     setState(() => _saving = true);
@@ -36,9 +35,7 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Customer "$name" created')));
+    showSuccessToast(context, "Customer \"$name\" created successfully");
   }
 
   @override
