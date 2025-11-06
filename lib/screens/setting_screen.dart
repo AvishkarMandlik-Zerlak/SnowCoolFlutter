@@ -4,6 +4,7 @@ import 'dart:io' show File if (dart.library.io) 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- ADD THIS
 import 'package:image_picker/image_picker.dart';
 import '../services/application_settings_api.dart';
 import '../utils/token_manager.dart';
@@ -32,6 +33,9 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
   final TextEditingController _termsController = TextEditingController();
 
   ApplicationSettingsApi? _api;
+
+  // ---------- NEW: Validation ----------
+  String? _challanSequenceError;
 
   @override
   void initState() {
@@ -75,12 +79,16 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
 
           _logoBase64 = settings.logoBase64;
           _signatureBase64 = settings.signatureBase64;
+
+          // Validate on load
+          _validateChallanSequence(_challanSequenceController.text);
         });
       } else {
         setState(() {
           _isExisting = false;
           _logoBase64 = null;
           _signatureBase64 = null;
+          _validateChallanSequence("1");
         });
       }
     } catch (e) {
@@ -89,6 +97,21 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       }
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  // ---------- NEW: Challan Sequence Validation ----------
+  void _validateChallanSequence(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _challanSequenceError = 'Sequence is required');
+      return;
+    }
+    final num = int.tryParse(trimmed);
+    if (num == null || num < 1) {
+      setState(() => _challanSequenceError = 'Must be a number ≥ 1');
+    } else {
+      setState(() => _challanSequenceError = null);
     }
   }
 
@@ -114,7 +137,10 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
   }
 
   void _resetSequence() {
-    setState(() => _challanSequenceController.text = "1");
+    setState(() {
+      _challanSequenceController.text = "1";
+      _challanSequenceError = null;
+    });
   }
 
   // ---------- Safe Image Decoders ----------
@@ -148,14 +174,25 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       return;
     }
 
+    // Final validation before save
+    _validateChallanSequence(_challanSequenceController.text);
+    if (_challanSequenceError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fix the Challan Sequence"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
+      final sequenceNum = int.tryParse(_challanSequenceController.text) ?? 1;
+
       final dto = ApplicationSettingsDTO(
         logoBase64: _logoBase64,
         signatureBase64: _signatureBase64,
         invoicePrefix: _invoicePrefixController.text,
         challanNumberFormat: _challanFormatController.text,
-        challanSequence: int.tryParse(_challanSequenceController.text) ?? 1,
+        challanSequence: sequenceNum,
         termsAndConditions: _termsController.text,
       );
 
@@ -242,7 +279,14 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildLabel("Challan Sequence"),
-                            _buildTextField(_challanSequenceController, "e.g., 1"),
+                            _buildTextField(
+                              _challanSequenceController,
+                              "e.g., 1",
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              onChanged: _validateChallanSequence,
+                              errorText: _challanSequenceError,
+                            ),
                           ],
                         ),
                       ),
@@ -307,7 +351,7 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
 
                   Center(
                     child: ElevatedButton(
-                      onPressed: _saveSettings,
+                      onPressed: _challanSequenceError != null ? null : _saveSettings,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: blueColor,
                         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
@@ -333,10 +377,22 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
         ),
       );
 
-  Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1}) {
+  // Updated _buildTextField to support errorText, onChanged, etc.
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hint, {
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    void Function(String)? onChanged,
+    String? errorText,
+  }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color.fromRGBO(20, 20, 20, 1)),
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
@@ -350,6 +406,8 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
           borderSide: const BorderSide(color: Color.fromRGBO(0, 140, 192, 1)),
           borderRadius: BorderRadius.circular(8),
         ),
+        errorText: errorText,
+        errorStyle: const TextStyle(color: Colors.red, fontSize: 12),
       ),
     );
   }
