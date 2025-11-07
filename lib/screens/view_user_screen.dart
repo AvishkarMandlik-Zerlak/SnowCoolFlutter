@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:snow_trading_cool/services/user_api.dart';
-import '../services/view_user_api.dart';
-import '../models/user_model.dart';
-import 'user_create_screen.dart';
+import '../services/view_user_api.dart'; // Import the API
+import '../models/user_model.dart'; // Assume User model is here
+import 'user_create_screen.dart'; // Import for Add User navigation
 
 class UserViewScreen extends StatefulWidget {
   const UserViewScreen({super.key});
@@ -16,7 +15,7 @@ class _UserViewScreenState extends State<UserViewScreen> {
   bool _isLoading = true;
   List<User> _users = [];
   final ViewUserApi _api = ViewUserApi();
-  final Map<int, bool> _passwordVisibility = {};
+  final Map<String, bool> _passwordVisibility = {}; // Per user password visibility state
 
   @override
   void initState() {
@@ -32,10 +31,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
     try {
       final users = await _api.getUsers();
       setState(() {
-        _users = users.isNotEmpty ? users : _getDemoUsers();
+        _users = users.isNotEmpty ? users : _getDemoUsers(); // Use demo if API empty
         _isLoading = false;
       });
     } catch (e) {
+      // On error, fallback to demo data
       setState(() {
         _users = _getDemoUsers();
         _isLoading = false;
@@ -51,11 +51,30 @@ class _UserViewScreenState extends State<UserViewScreen> {
     }
   }
 
+  // Demo data function
   List<User> _getDemoUsers() {
     return [
-      User(id: 1, username: 'demo_user1', password: 'demo123', role: 'Employee', active: true),
-      User(id: 2, username: 'admin_demo', password: 'admin456', role: 'Admin', active: false),
-      User(id: 3, username: 'test_emp', password: 'test789', role: 'Employee', active: true),
+      User(
+        id: '1',
+        username: 'demo_user1',
+        password: 'demo123',
+        role: 'Employee',
+        active: true,
+      ),
+      User(
+        id: '2',
+        username: 'admin_demo',
+        password: 'admin456',
+        role: 'Admin',
+        active: false,
+      ),
+      User(
+        id: '3',
+        username: 'test_emp',
+        password: 'test789',
+        role: 'Employee',
+        active: true,
+      ),
     ];
   }
 
@@ -65,24 +84,32 @@ class _UserViewScreenState extends State<UserViewScreen> {
       final response = await _api.updateUserStatus(user.id, isActive);
       if (response.success) {
         setState(() {
-          user.active = isActive;
+          user.active = isActive; // Update local model
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User status updated successfully!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('User status updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message ?? 'Failed to update status'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(response.message ?? 'Failed to update status'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error updating status: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  // EDIT: Navigate to UserCreateScreen with user data
   Future<void> _editUser(User user) async {
     await Navigator.push(
       context,
@@ -90,13 +117,10 @@ class _UserViewScreenState extends State<UserViewScreen> {
         builder: (context) => UserCreateScreen(user: user),
       ),
     );
-    _loadUsers(); // Refresh list after edit
+    _loadUsers(); // Refresh the list after editing
   }
 
-  // DELETE: Safe context handling
   Future<void> _deleteUser(User user) async {
-    final BuildContext dialogContext = context;
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -104,32 +128,28 @@ class _UserViewScreenState extends State<UserViewScreen> {
         content: Text('Are you sure you want to delete ${user.username}?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(dialogContext);
-              final userApi = UserApi();
+              Navigator.pop(context);
               try {
-                final response = await userApi.deleteUser(user.id);
-                if (!dialogContext.mounted) return;
-
+                final response = await _api.deleteUser(user.id);
                 if (response.success) {
                   setState(() {
                     _users.remove(user);
                   });
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('User deleted successfully!'), backgroundColor: Colors.green),
                   );
                 } else {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(response.message ?? 'Failed to delete user'), backgroundColor: Colors.red),
                   );
                 }
               } catch (e) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Error deleting user: $e'), backgroundColor: Colors.red),
                 );
               }
@@ -144,8 +164,8 @@ class _UserViewScreenState extends State<UserViewScreen> {
   void _navigateToAddUser() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const UserCreateScreen()),
-    ).then((_) => _loadUsers());
+      MaterialPageRoute(builder: (context) => const UserCreateScreen(user: null,)),
+    ).then((_) => _loadUsers()); // Refresh list after add
   }
 
   @override
@@ -177,13 +197,14 @@ class _UserViewScreenState extends State<UserViewScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        // No actions here - unique button moved to FAB
       ),
       body: Padding(
         padding: EdgeInsets.only(
           left: isMobile ? 16 : 24,
           right: isMobile ? 16 : 24,
           top: 16,
-          bottom: 80,
+          bottom: 80, // Extra bottom padding to avoid FAB overlap
         ),
         child: _users.isEmpty
             ? Center(
@@ -194,12 +215,16 @@ class _UserViewScreenState extends State<UserViewScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'No users found',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey),
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
               )
-            : ListView.builder(
+            : ListView.builder( // Use ListView.builder for better performance and auto-scroll
                 itemCount: _users.length,
                 itemBuilder: (context, index) {
                   final user = _users[index];
@@ -207,13 +232,18 @@ class _UserViewScreenState extends State<UserViewScreen> {
                 },
               ),
       ),
+      // Unique Floating Action Button for Add User (custom styled)
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddUser,
         backgroundColor: const Color.fromRGBO(0, 140, 192, 1),
         icon: const Icon(Icons.person_add, color: Colors.white),
         label: Text(
           'Add User',
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         tooltip: 'Add New User',
       ),
@@ -224,25 +254,26 @@ class _UserViewScreenState extends State<UserViewScreen> {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: IntrinsicHeight(
+      margin: const EdgeInsets.only(bottom: 8), // Smaller margin
+      child: IntrinsicHeight( // Wrap in IntrinsicHeight to fit content tightly
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8), // Tighter padding
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min, // Min size to prevent extra height
             children: [
+              // Edit/Delete icons row (top-right, with space)
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero, // No padding
+                    constraints: const BoxConstraints(), // No constraints
                     icon: const Icon(Icons.edit, size: 16, color: Colors.blue),
                     onPressed: () => _editUser(user),
                     tooltip: 'Edit User',
                   ),
-                  const SizedBox(width: 8.0),
+                  const SizedBox(width: 8.0), // Space between edit and delete
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -252,26 +283,26 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   ),
                 ],
               ),
-              Expanded(child: _buildUserField('Username', user.username, Icons.person, isMobile)),
-              const SizedBox(height: 2),
-              Expanded(child: _buildPasswordField(user)),
-              const SizedBox(height: 2),
-              Expanded(child: _buildUserField('Role', user.role, Icons.admin_panel_settings, isMobile)),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Active',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.black87),
-                  ),
-                  Switch(
-                    value: user.active,
-                    onChanged: (value) => _toggleUserStatus(user),
-                    activeColor: const Color.fromRGBO(0, 140, 192, 1),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ],
+              // Username Field
+              Expanded( // Use Expanded to force fit in available space
+                child: _buildUserField('Username', user.username, Icons.person, isMobile),
+              ),
+              const SizedBox(height: 2), // Minimal
+              // Password Field (with show/hide)
+              Expanded(
+                child: _buildPasswordField(user),
+              ),
+              const SizedBox(height: 2), // Minimal
+              // Role Field
+              Expanded(
+                child: _buildUserField('Role', user.role, Icons.admin_panel_settings, isMobile),
+              ),
+              const SizedBox(height: 4), // Minimal
+              // Active Toggle
+              _buildPermissionRow(
+                'Active',
+                user.active,
+                (value) => _toggleUserStatus(user),
               ),
             ],
           ),
@@ -283,8 +314,8 @@ class _UserViewScreenState extends State<UserViewScreen> {
   Widget _buildUserField(String label, String value, IconData icon, bool isMobile) {
     return Row(
       children: [
-        Icon(icon, color: const Color.fromRGBO(0, 140, 192, 1), size: 14),
-        const SizedBox(width: 3),
+        Icon(icon, color: const Color.fromRGBO(0, 140, 192, 1), size: 14), // Smaller icon
+        const SizedBox(width: 3), // Minimal
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,14 +323,21 @@ class _UserViewScreenState extends State<UserViewScreen> {
             children: [
               Text(
                 label,
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.black87),
+                style: GoogleFonts.inter(
+                  fontSize: 11, // Smaller
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
               ),
-              const SizedBox(height: 1),
-              FittedBox(
+              const SizedBox(height: 1), // Minimal
+              FittedBox( // Use FittedBox to fit text if too long
                 fit: BoxFit.scaleDown,
                 child: Text(
                   value.isEmpty ? 'Not set' : value,
-                  style: GoogleFonts.inter(fontSize: 12, color: value.isEmpty ? Colors.grey : Colors.black87),
+                  style: GoogleFonts.inter(
+                    fontSize: 12, // Smaller
+                    color: value.isEmpty ? Colors.grey : Colors.black87,
+                  ),
                 ),
               ),
             ],
@@ -330,7 +368,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
               children: [
                 const Text(
                   'Password',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 1),
                 FittedBox(
@@ -338,9 +380,19 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(displayPassword, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                      Text(
+                        displayPassword,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                      ),
                       const SizedBox(width: 4),
-                      Icon(isVisible ? Icons.visibility_off : Icons.visibility, size: 12, color: Colors.grey),
+                      Icon(
+                        isVisible ? Icons.visibility_off : Icons.visibility,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                     ],
                   ),
                 ),
@@ -349,6 +401,39 @@ class _UserViewScreenState extends State<UserViewScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // Helper for permission toggle row (ultra-compact with IconButton)
+  Widget _buildPermissionRow(String label, bool value, ValueChanged<bool> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.0), // Minimal vertical
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11, // Smaller text
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: () => onChanged(!value),
+            icon: Icon(
+              value ? Icons.toggle_on : Icons.toggle_off,
+              color: value ? const Color.fromRGBO(0, 140, 192, 1) : Colors.white,
+              size: 60, // Compact size to match photo style
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            splashRadius: 20, // Small splash for tap feel
+          ),
+        ],
+      ),
     );
   }
 }

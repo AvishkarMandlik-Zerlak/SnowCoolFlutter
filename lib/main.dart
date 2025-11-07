@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart'; // Core Flutter library for building UIs.
+import 'package:snow_trading_cool/dev_utils.dart';
 import 'screens/login_screen.dart'; // Import the login screen for navigation.
 
 void main() {
   // This function runs the app and initializes the MaterialApp.
+  DevUtils.createDemoAdmin();
   runApp(const MyApp());
 }
 

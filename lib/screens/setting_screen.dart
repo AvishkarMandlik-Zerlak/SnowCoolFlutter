@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // <-- ADD THIS
 import 'package:image_picker/image_picker.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/application_settings_api.dart';
 import '../utils/token_manager.dart';
 
@@ -49,9 +50,7 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
 
     if (token == null || token.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("User not authenticated! Please log in again.")),
-        );
+        showErrorToast(context, "User not authenticated! Please log in again.");
         Navigator.pop(context);
       }
       return;
@@ -93,7 +92,7 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to load settings: $e")));
+        showErrorToast(context, "Failed to load settings: $e");
       }
     } finally {
       setState(() => _isLoading = false);
@@ -170,16 +169,14 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
 
   Future<void> _saveSettings() async {
     if (_api == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not authenticated")));
+      showErrorToast(context, "Not authenticated");
       return;
     }
 
     // Final validation before save
     _validateChallanSequence(_challanSequenceController.text);
     if (_challanSequenceError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fix the Challan Sequence"), backgroundColor: Colors.red),
-      );
+      showErrorToast(context, "Please fix the Challan Sequence");
       return;
     }
 
@@ -204,18 +201,13 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isExisting ? "Settings Updated Successfully" : "Settings Created Successfully"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        showSuccessToast(context, _isExisting ? "Settings Updated Successfully" : "Settings Created Successfully");
       }
 
       await _fetchSettings();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+        showErrorToast(context, "Error saving settings: $e");
       }
     } finally {
       setState(() => _isLoading = false);

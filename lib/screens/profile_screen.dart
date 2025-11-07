@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/setting_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/profile_api.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -36,20 +37,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } else {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ?? 'Profile not found'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          showWarningToast(context, "Profile not found");
         }
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e'), backgroundColor: Colors.red),
-        );
+        showErrorToast(context, "Error loading profile: $e");
       }
     }
   }
@@ -57,9 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _updateProfile() async {
     setState(() => _isEditing = !_isEditing);
     if (!_isEditing) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green),
-      );
+      showSuccessToast(context, "Profile updated successfully");
     }
   }
 

@@ -1,9 +1,630 @@
-// view_challan.dart
+// // view_challan.dart
+// import 'package:data_table_2/data_table_2.dart';
+// import 'package:flutter/material.dart';
+// import 'package:lottie/lottie.dart';
+// import 'package:share_plus/share_plus.dart';
+// import 'package:snow_trading_cool/screens/challan_screen.dart';
+// import 'package:snow_trading_cool/services/challan_api.dart';
+// import 'package:snow_trading_cool/widgets/custom_toast.dart';
+
+// class ViewChallanScreen extends StatefulWidget {
+//   const ViewChallanScreen({super.key});
+
+//   @override
+//   State<ViewChallanScreen> createState() => _ViewChallanScreenState();
+// }
+
+// class _ViewChallanScreenState extends State<ViewChallanScreen> {
+//   final TextEditingController searchController = TextEditingController();
+
+//   late ChallanDataSource _dataSource;
+
+//   int _rowsPerPage = 5;
+//   List<int> _availableRowsPerPage = [5, 10, 20];
+//   final double headingHeight = 56;
+//   final double dataRowHeight = 64;
+
+//   String selectedType = 'All';
+
+//   DateTime? fromDate;
+//   DateTime? toDate;
+//   final ChallanApi challanApi = ChallanApi();
+//   List<Map<String, dynamic>> _challanList = [];
+//   bool _isLoading = true;
+
+//   int _tableRebuildKey = 0;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _fetchChallans();
+//   }
+
+//   Future<void> _fetchChallans() async {
+//     setState(() => _isLoading = true);
+//     try {
+//       final data = await challanApi.fetchAllChallans();
+//       setState(() {
+//         _challanList = data;
+//         _dataSource = ChallanDataSource(
+//           _challanList,
+//           challanApi,
+//           context,
+//           _fetchChallans, // Pass refresh callback
+//         );
+//         _updatePagination();
+//         _isLoading = false;
+//       });
+//     } catch (e) {
+//       if (mounted) {
+//         showErrorToast(context, "Failed to load challans: $e");
+//       }
+//       setState(() => _isLoading = false);
+//     }
+//   }
+
+//   void _applyFilters() {
+//     final query = searchController.text.toLowerCase();
+//     final type = selectedType;
+
+//     setState(() {
+//       _dataSource.applyFilters(query, type);
+//       _updatePagination();
+//     });
+//   }
+
+//   void _resetFilters() {
+//     searchController.clear();
+//     selectedType = 'All';
+//     _dataSource.applyFilters('', 'All');
+//     _updatePagination();
+//     setState(() => _tableRebuildKey++);
+//   }
+
+//   void _updatePagination() {
+//     final totalRows = _dataSource.rowCount;
+
+//     if (totalRows == 0) {
+//       _rowsPerPage = 1;
+//       _availableRowsPerPage = [1];
+//     } else if (totalRows <= 8) {
+//       _rowsPerPage = totalRows;
+//       _availableRowsPerPage = [totalRows];
+//     } else if (totalRows <= 10) {
+//       _rowsPerPage = 8;
+//       _availableRowsPerPage = [8, 10];
+//     } else if (totalRows <= 15) {
+//       _rowsPerPage = 8;
+//       _availableRowsPerPage = [8, 10, 15];
+//     } else if (totalRows <= 20) {
+//       _rowsPerPage = 8;
+//       _availableRowsPerPage = [8, 10, 20];
+//     } else {
+//       _rowsPerPage = 8;
+//       _availableRowsPerPage = [8, 10, 20, 50];
+//     }
+
+//     _tableRebuildKey++;
+//     setState(() {});
+//   }
+
+//   Future<void> _selectDateRange() async {
+//     final now = DateTime.now();
+
+//     final pickedFrom = await showDatePicker(
+//       context: context,
+//       initialDate: fromDate ?? now,
+//       firstDate: DateTime(2024),
+//       lastDate: DateTime(2026),
+//       helpText: 'Select Start Date',
+//     );
+
+//     if (pickedFrom == null) return;
+
+//     final pickedTo = await showDatePicker(
+//       context: context,
+//       initialDate: toDate ?? pickedFrom,
+//       firstDate: pickedFrom,
+//       lastDate: DateTime(2026),
+//       helpText: 'Select End Date',
+//     );
+
+//     if (pickedTo == null) return;
+
+//     setState(() {
+//       fromDate = pickedFrom;
+//       toDate = pickedTo;
+//       _filterByDate();
+//     });
+//   }
+
+//   void _filterByDate() {
+//     if (fromDate == null || toDate == null) return;
+
+//     final filtered = _challanList.where((challan) {
+//       final date = DateTime.parse(challan['date']);
+//       return date.isAfter(fromDate!.subtract(const Duration(days: 1))) &&
+//           date.isBefore(toDate!.add(const Duration(days: 1)));
+//     }).toList();
+
+//     setState(() {
+//       _dataSource = ChallanDataSource(
+//         filtered,
+//         challanApi,
+//         context,
+//         _fetchChallans,
+//       );
+//       _updatePagination();
+//     });
+//   }
+
+//   @override
+//   void dispose() {
+//     searchController.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     if (_isLoading) {
+//       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+//     }
+
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('Challan Details'),
+//         actions: [
+//           GestureDetector(
+//             onTap: () {
+//               Navigator.of(
+//                 context,
+//               ).push(MaterialPageRoute(builder: (_) => const ChallanScreen()));
+//             },
+//             child: Container(
+//               height: 30,
+//               width: 110,
+//               margin: const EdgeInsets.only(right: 12),
+//               decoration: BoxDecoration(
+//                 borderRadius: BorderRadius.circular(10),
+//                 color: const Color.fromRGBO(0, 140, 192, 1),
+//               ),
+//               child: const Center(
+//                 child: Text(
+//                   "Add Challan",
+//                   style: TextStyle(
+//                     fontSize: 16,
+//                     fontWeight: FontWeight.w500,
+//                     color: Colors.white,
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//       body: Padding(
+//         padding: const EdgeInsets.all(12.0),
+//         child: Column(
+//           children: [
+//             // Filters Row
+//             Row(
+//               children: [
+//                 Expanded(
+//                   child: TextField(
+//                     controller: searchController,
+//                     decoration: const InputDecoration(
+//                       contentPadding: EdgeInsets.symmetric(
+//                         vertical: 10,
+//                         horizontal: 14,
+//                       ),
+//                       hintStyle: TextStyle(
+//                         fontSize: 16,
+//                         fontWeight: FontWeight.w500,
+//                         color: Color.fromRGBO(156, 156, 156, 1),
+//                       ),
+//                       enabledBorder: OutlineInputBorder(
+//                         borderSide: BorderSide(
+//                           color: Color.fromRGBO(156, 156, 156, 1),
+//                         ),
+//                         borderRadius: BorderRadius.all(Radius.circular(8)),
+//                       ),
+//                       focusedBorder: OutlineInputBorder(
+//                         borderSide: BorderSide(
+//                           color: Color.fromRGBO(156, 156, 156, 1),
+//                         ),
+//                         borderRadius: BorderRadius.all(Radius.circular(8)),
+//                       ),
+//                       hintText: 'Search by Customer Name',
+//                     ),
+//                     onChanged: (_) => _applyFilters(),
+//                   ),
+//                 ),
+//                 const SizedBox(width: 8),
+//                 Container(
+//                   padding: const EdgeInsets.symmetric(horizontal: 12),
+//                   decoration: BoxDecoration(
+//                     borderRadius: BorderRadius.circular(10),
+//                     border: Border.all(
+//                       color: const Color.fromRGBO(0, 140, 192, 1),
+//                     ),
+//                   ),
+//                   child: DropdownButton<String>(
+//                     value: selectedType,
+//                     icon: const Icon(Icons.filter_list_outlined),
+//                     dropdownColor: Colors.white,
+//                     underline: const SizedBox(),
+//                     style: const TextStyle(
+//                       fontSize: 16,
+//                       fontWeight: FontWeight.w500,
+//                       color: Colors.black,
+//                     ),
+//                     items: const [
+//                       DropdownMenuItem(value: 'All', child: Text('All')),
+//                       DropdownMenuItem(
+//                         value: 'Receive',
+//                         child: Text('Receive'),
+//                       ),
+//                       DropdownMenuItem(
+//                         value: 'Delivery',
+//                         child: Text('Delivery'),
+//                       ),
+//                     ],
+//                     onChanged: (value) {
+//                       if (value == null) return;
+//                       setState(() {
+//                         selectedType = value;
+//                         _applyFilters();
+//                       });
+//                     },
+//                   ),
+//                 ),
+//                 const SizedBox(width: 8),
+//                 GestureDetector(
+//                   onTap: _selectDateRange,
+//                   child: Container(
+//                     padding: const EdgeInsets.symmetric(
+//                       horizontal: 12,
+//                       vertical: 12,
+//                     ),
+//                     decoration: BoxDecoration(
+//                       borderRadius: BorderRadius.circular(10),
+//                       border: Border.all(
+//                         color: const Color.fromRGBO(0, 140, 192, 1),
+//                       ),
+//                     ),
+//                     child: const Row(
+//                       children: [
+//                         Text("Date", style: TextStyle(fontSize: 16)),
+//                         SizedBox(width: 4),
+//                         Icon(Icons.calendar_today_outlined, size: 18),
+//                       ],
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+
+//             _isLoading
+//                 ? Center(
+//                     child: Container(
+//                       // height: 250,
+//                       alignment: Alignment.center,
+//                       child: Lottie.asset(
+//                         'assets/lottie/Oxygen cylinder.json',
+//                         width: 150,
+//                         height: 150,
+//                         fit: BoxFit.cover,
+//                       ),
+//                     ),
+//                   )
+//                 :
+//                   // Dynamic Table
+//                   Column(
+//                     children: [
+//                       const SizedBox(height: 12),
+//                       LayoutBuilder(
+//                         builder: (context, constraints) {
+//                           final totalRows = _dataSource.rowCount;
+//                           final visibleRows = totalRows < _rowsPerPage
+//                               ? totalRows
+//                               : _rowsPerPage;
+//                           final tableHeight =
+//                               headingHeight +
+//                               (visibleRows * dataRowHeight) +
+//                               70;
+
+//                           return AnimatedContainer(
+//                             duration: const Duration(milliseconds: 250),
+//                             height: tableHeight,
+//                             decoration: BoxDecoration(
+//                               border: Border.all(
+//                                 color: const Color.fromRGBO(238, 238, 238, 1),
+//                               ),
+//                               borderRadius: BorderRadius.circular(12),
+//                             ),
+//                             child: PaginatedDataTable2(
+//                               key: ValueKey(_tableRebuildKey),
+//                               source: _dataSource,
+//                               rowsPerPage: _rowsPerPage,
+//                               availableRowsPerPage: _availableRowsPerPage,
+//                               onRowsPerPageChanged: (value) {
+//                                 if (value == null) return;
+//                                 setState(() => _rowsPerPage = value);
+//                               },
+//                               header: null,
+//                               wrapInCard: false,
+//                               headingRowColor: WidgetStateProperty.all(
+//                                 const Color.fromRGBO(238, 238, 238, 1),
+//                               ),
+//                               showFirstLastButtons: true,
+//                               headingRowHeight: headingHeight,
+//                               dataRowHeight: dataRowHeight,
+//                               fixedLeftColumns: 1,
+//                               columnSpacing: 12,
+//                               horizontalMargin: 12,
+//                               minWidth: 600,
+//                               columns: const [
+//                                 DataColumn2(
+//                                   label: Text(
+//                                     'Customer Name',
+//                                     style: TextStyle(
+//                                       fontWeight: FontWeight.bold,
+//                                       color: Color.fromRGBO(0, 140, 192, 1),
+//                                     ),
+//                                   ),
+//                                 ),
+//                                 DataColumn2(
+//                                   fixedWidth: 80,
+//                                   label: Text(
+//                                     'Type',
+//                                     style: TextStyle(
+//                                       fontWeight: FontWeight.bold,
+//                                       color: Color.fromRGBO(0, 140, 192, 1),
+//                                     ),
+//                                   ),
+//                                 ),
+//                                 DataColumn2(
+//                                   label: Text(
+//                                     'Location',
+//                                     style: TextStyle(
+//                                       fontWeight: FontWeight.bold,
+//                                       color: Color.fromRGBO(0, 140, 192, 1),
+//                                     ),
+//                                   ),
+//                                 ),
+//                                 DataColumn2(
+//                                   fixedWidth: 60,
+//                                   label: Text(
+//                                     'Qty',
+//                                     style: TextStyle(
+//                                       fontWeight: FontWeight.bold,
+//                                       color: Color.fromRGBO(0, 140, 192, 1),
+//                                     ),
+//                                   ),
+//                                 ),
+//                                 DataColumn2(
+//                                   fixedWidth: 200,
+//                                   label: Text(
+//                                     'Actions',
+//                                     textAlign: TextAlign.center,
+//                                     style: TextStyle(
+//                                       fontWeight: FontWeight.bold,
+//                                       color: Color.fromRGBO(0, 140, 192, 1),
+//                                     ),
+//                                   ),
+//                                 ),
+//                               ],
+//                             ),
+//                           );
+//                         },
+//                       ),
+//                     ],
+//                   ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// // ========== Data Source ==========
+// class ChallanDataSource extends DataTableSource {
+//   final List<Map<String, dynamic>> _originalData;
+//   List<Map<String, dynamic>> _filteredData = [];
+//   final ChallanApi _api;
+//   final BuildContext context;
+//   final VoidCallback onRefresh;
+
+//   ChallanDataSource(
+//     this._originalData,
+//     this._api,
+//     this.context,
+//     this.onRefresh,
+//   ) {
+//     _filteredData = List.from(_originalData);
+//   }
+
+//   void applyFilters(String query, String type) {
+//     _filteredData = _originalData.where((challan) {
+//       final matchesName = challan['name'].toString().toLowerCase().contains(
+//         query,
+//       );
+//       final matchesType = type == 'All' || challan['type'] == type;
+//       return matchesName && matchesType;
+//     }).toList();
+//     notifyListeners();
+//   }
+
+//   Future<void> _deleteChallan(String challanId) async {
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       builder: (_) => AlertDialog(
+//         title: const Text('Delete Challan'),
+//         content: const Text('Are you sure you want to delete this challan?'),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context, false),
+//             child: const Text('Cancel'),
+//           ),
+//           ElevatedButton(
+//             onPressed: () => Navigator.pop(context, true),
+//             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+//             child: const Text('Delete'),
+//           ),
+//         ],
+//       ),
+//     );
+
+//     if (confirmed != true) return;
+
+//     final success = await _api.deleteChallan(int.parse(challanId));
+
+//     if (success) {
+//       showSuccessToast(context, 'Challan deleted successfully');
+//       onRefresh();
+//     } else {
+//       showErrorToast(context, 'Failed to delete challan');
+//     }
+//   }
+
+//   Future<void> _editChallan(String challanId) async {
+//     final controller = TextEditingController();
+
+//     final newName = await showDialog<String>(
+//       context: context,
+//       builder: (_) => AlertDialog(
+//         title: const Text('Edit Customer Name'),
+//         content: TextField(
+//           controller: controller,
+//           decoration: const InputDecoration(hintText: 'Enter new name'),
+//         ),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.pop(context),
+//             child: const Text('Cancel'),
+//           ),
+//           ElevatedButton(
+//             onPressed: () => Navigator.pop(context, controller.text.trim()),
+//             child: const Text('Save'),
+//           ),
+//         ],
+//       ),
+//     );
+
+//     if (newName == null || newName.isEmpty) return;
+
+//     try {
+//       final challan = await _api.getChallan(int.parse(challanId));
+//       challan['customerName'] = newName;
+
+//       final success = await _api.updateChallan(int.parse(challanId), challan);
+
+//       if (success) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('Challan updated successfully'),
+//             backgroundColor: Colors.green,
+//           ),
+//         );
+//         onRefresh();
+//       } else {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('Failed to update challan'),
+//             backgroundColor: Colors.red,
+//           ),
+//         );
+//       }
+//     } catch (e) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+//       );
+//     }
+//   }
+
+//   @override
+//   DataRow? getRow(int index) {
+//     if (index >= _filteredData.length) return null;
+//     final challan = _filteredData[index];
+
+//     return DataRow(
+//       cells: [
+//         DataCell(Text(challan['name'] ?? '')),
+//         DataCell(Text(challan['type'] ?? '')),
+//         DataCell(Text(challan['location'] ?? '')),
+//         DataCell(Text(challan['qty'] ?? '')),
+//         DataCell(
+//           Row(
+//             mainAxisSize: MainAxisSize.min,
+//             children: [
+//               IconButton(
+//                 icon: const Icon(Icons.edit, size: 18),
+//                 color: Colors.blue,
+//                 onPressed: () => _editChallan(challan['id']),
+//               ),
+//               IconButton(
+//                 icon: const Icon(Icons.delete, size: 18),
+//                 color: Colors.red,
+//                 onPressed: () => _deleteChallan(challan['id']),
+//               ),
+//               IconButton(
+//                 icon: const Icon(Icons.share, size: 18),
+//                 color: Colors.green,
+//                 onPressed: () {
+//                   final text =
+//                       '''
+// Challan ID: ${challan['id']}
+// Customer: ${challan['name']}
+// Type: ${challan['type']}
+// Location: ${challan['location']}
+// Total Qty: ${challan['qty']}
+// Date: ${challan['date']}
+//                   '''
+//                           .trim();
+//                   Share.share(text, subject: 'Challan Details');
+//                 },
+//               ),
+//               IconButton(
+//                 icon: const Icon(Icons.print, size: 18),
+//                 color: Colors.orange,
+//                 onPressed: () {
+//                   ScaffoldMessenger.of(context).showSnackBar(
+//                     const SnackBar(content: Text('Print feature coming soon!')),
+//                   );
+//                 },
+//               ),
+//             ],
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+
+//   @override
+//   int get rowCount => _filteredData.length;
+
+//   @override
+//   bool get isRowCountApproximate => false;
+
+//   @override
+//   int get selectedRowCount => 0;
+// }
+
+
+import 'dart:io';
+
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:snow_trading_cool/screens/challan_screen.dart';
 import 'package:snow_trading_cool/services/challan_api.dart';
+import 'package:intl/intl.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 
 class ViewChallanScreen extends StatefulWidget {
   const ViewChallanScreen({super.key});
@@ -13,362 +634,215 @@ class ViewChallanScreen extends StatefulWidget {
 }
 
 class _ViewChallanScreenState extends State<ViewChallanScreen> {
-  final TextEditingController searchController = TextEditingController();
+  final List<Map<String, dynamic>> _customers = [
+    {
+      'id': '1',
+      'name': 'Abhishek Sharma',
+      'type': 'Receive',
+      'location': 'Mumbai, Maharashtra',
+      'qty': "2",
+      'date': '2025-10-01',
+    },
+    {
+      'id': '2',
+      'name': 'Priya Singh',
+      'type': 'Delivery',
+      'location': 'Delhi',
+      'qty': "3",
+      'date': '2025-10-08',
+    },
+    {
+      'id': '3',
+      'name': 'Rakesh Kumar',
+      'type': 'Delivery',
+      'location': 'Bangalore',
+      'qty': "1",
+      'date': '2025-11-01',
+    },
+    {
+      'id': '4',
+      'name': 'Anjali Mehta',
+      'type': 'Receive',
+      'location': 'Pune',
+      'qty': "6",
+      'date': '2025-10-15',
+    },
+    {
+      'id': '5',
+      'name': 'Vikram Patel',
+      'type': 'Delivery',
+      'location': 'Ahmedabad',
+      'qty': "4",
+      'date': '2025-08-01',
+    },
+    {
+      'id': '6',
+      'name': 'Neha Sharma',
+      'type': 'Receive',
+      'location': 'Chandigarh',
+      'qty': "2",
+      'date': '2025-09-18',
+    },
+    {
+      'id': '7',
+      'name': 'Abhishek Verma',
+      'type': 'Delivery',
+      'location': 'Nashik',
+      'qty': "5",
+      'date': '2025-07-01',
+    },
+    {
+      'id': '8',
+      'name': 'Priya Nair',
+      'type': 'Receive',
+      'location': 'Indore',
+      'qty': "3",
+      'date': '2025-02-01',
+    },
+    {
+      'id': '9',
+      'name': 'Rakesh Yadav',
+      'type': 'Receive',
+      'location': 'Jaipur',
+      'qty': "1",
+      'date': '2025-05-01',
+    },
+    {
+      'id': '10',
+      'name': 'Siddharth Deshmukh',
+      'type': 'Delivery',
+      'location': 'Goa',
+      'qty': "2",
+      'date': '2025-10-01',
+    },
+    {
+      'id': '11',
+      'name': 'Pooja Iyer',
+      'type': 'Receive',
+      'location': 'Nagpur',
+      'qty': "7",
+      'date': '2025-10-30',
+    },
+    {
+      'id': '12',
+      'name': 'Vikram Chauhan',
+      'type': 'Receive',
+      'location': 'Surat',
+      'qty': "3",
+      'date': '2025-04-01',
+    },
+    {
+      'id': '13',
+      'name': 'Neha Pandey',
+      'type': 'Delivery',
+      'location': 'Lucknow',
+      'qty': "2",
+      'date': '2025-10-13',
+    },
+    {
+      'id': '14',
+      'name': 'Amit Joshi',
+      'type': 'Delivery',
+      'location': 'Hyderabad',
+      'qty': "4",
+      'date': '2025-10-06',
+    },
+    {
+      'id': '15',
+      'name': 'Anjali Bhatia',
+      'type': 'Delivery',
+      'location': 'Bhopal',
+      'qty': "5",
+      'date': '2025-12-01',
+    },
+  ];
 
-  late ChallanDataSource _dataSource;
+  bool _selectionMode = false;
 
-  int _rowsPerPage = 5;
-  List<int> _availableRowsPerPage = [5, 10, 20];
-  final double headingHeight = 56;
-  final double dataRowHeight = 64;
-
-  String selectedType = 'All';
-
-  DateTime? fromDate;
-  DateTime? toDate;
   final ChallanApi challanApi = ChallanApi();
-  List<Map<String, dynamic>> _challanList = [];
-  bool _isLoading = true;
+  List<Map<String, dynamic>> _challans = [];
+  List<Map<String, dynamic>> _filteredData = [];
 
-  int _tableRebuildKey = 0;
+  String _searchQuery = '';
+  String _selectedType = 'All';
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  List<String> _selectedIds = [];
+  int _currentPage = 0;
+  final int _rowsPerPage = 10;
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchChallans();
+  List<Map<String, dynamic>> get _filteredCustomers {
+    return _customers.where((customer) {
+      final nameMatch = customer['name'].toLowerCase().contains(
+        _searchQuery.toLowerCase(),
+      );
+      final typeMatch =
+          _selectedType == 'All' || customer['type'] == _selectedType;
+
+      final date = DateTime.parse(customer['date']);
+      final fromOk =
+          _fromDate == null ||
+          date.isAfter(_fromDate!.subtract(const Duration(days: 1)));
+      final toOk =
+          _toDate == null ||
+          date.isBefore(_toDate!.add(const Duration(days: 1)));
+
+      return nameMatch && typeMatch && fromOk && toOk;
+    }).toList();
   }
 
-  Future<void> _fetchChallans() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await challanApi.fetchAllChallans();
-      setState(() {
-        _challanList = data;
-        _dataSource = ChallanDataSource(
-          _challanList,
-          challanApi,
-          context,
-          _fetchChallans, // Pass refresh callback
-        );
-        _updatePagination();
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load challans: $e')),
-        );
-      }
-      setState(() => _isLoading = false);
-    }
+  List<Map<String, dynamic>> get _paginatedCustomers {
+    final start = _currentPage * _rowsPerPage;
+    final end = start + _rowsPerPage;
+    final filtered = _filteredCustomers;
+    // if (start >= _filteredData.length) return [];
+    // return _filteredData.sublist(start, end.clamp(0, _filteredData.length));
+    if (start >= filtered.length) return [];
+    return filtered.sublist(start, end.clamp(0, filtered.length));
   }
 
-  void _applyFilters() {
-    final query = searchController.text.toLowerCase();
-    final type = selectedType;
-
-    setState(() {
-      _dataSource.applyFilters(query, type);
-      _updatePagination();
-    });
-  }
-
-  void _resetFilters() {
-    searchController.clear();
-    selectedType = 'All';
-    _dataSource.applyFilters('', 'All');
-    _updatePagination();
-    setState(() => _tableRebuildKey++);
-  }
-
-  void _updatePagination() {
-    final totalRows = _dataSource.rowCount;
-
-    if (totalRows == 0) {
-      _rowsPerPage = 1;
-      _availableRowsPerPage = [1];
-    } else if (totalRows <= 8) {
-      _rowsPerPage = totalRows;
-      _availableRowsPerPage = [totalRows];
-    } else if (totalRows <= 10) {
-      _rowsPerPage = 8;
-      _availableRowsPerPage = [8, 10];
-    } else if (totalRows <= 15) {
-      _rowsPerPage = 8;
-      _availableRowsPerPage = [8, 10, 15];
-    } else if (totalRows <= 20) {
-      _rowsPerPage = 8;
-      _availableRowsPerPage = [8, 10, 20];
-    } else {
-      _rowsPerPage = 8;
-      _availableRowsPerPage = [8, 10, 20, 50];
-    }
-
-    _tableRebuildKey++;
-    setState(() {});
-  }
-
-  Future<void> _selectDateRange() async {
-    final now = DateTime.now();
-
-    final pickedFrom = await showDatePicker(
+  Future<void> _pickFromDate() async {
+    final picked = await showDatePicker(
       context: context,
-      initialDate: fromDate ?? now,
+      initialDate: _fromDate ?? DateTime.now(),
       firstDate: DateTime(2024),
       lastDate: DateTime(2026),
-      helpText: 'Select Start Date',
     );
+    if (picked != null) setState(() => _fromDate = picked);
+  }
 
-    if (pickedFrom == null) return;
-
-    final pickedTo = await showDatePicker(
+  Future<void> _pickToDate() async {
+    final picked = await showDatePicker(
       context: context,
-      initialDate: toDate ?? pickedFrom,
-      firstDate: pickedFrom,
+      initialDate: _toDate ?? DateTime.now(),
+      firstDate: DateTime(2024),
       lastDate: DateTime(2026),
-      helpText: 'Select End Date',
     );
+    if (picked != null) setState(() => _toDate = picked);
+  }
 
-    if (pickedTo == null) return;
-
+  void _toggleSelect(String id) {
     setState(() {
-      fromDate = pickedFrom;
-      toDate = pickedTo;
-      _filterByDate();
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
     });
   }
 
-  void _filterByDate() {
-    if (fromDate == null || toDate == null) return;
-
-    final filtered = _challanList.where((challan) {
-      final date = DateTime.parse(challan['date']);
-      return date.isAfter(fromDate!.subtract(const Duration(days: 1))) &&
-          date.isBefore(toDate!.add(const Duration(days: 1)));
-    }).toList();
-
-    setState(() {
-      _dataSource = ChallanDataSource(
-        filtered,
-        challanApi,
-        context,
-        _fetchChallans,
-      );
-      _updatePagination();
-    });
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Challan Details'),
-        actions: [
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChallanScreen()),
-              );
-            },
-            child: Container(
-              height: 30,
-              width: 110,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: const Color.fromRGBO(0, 140, 192, 1),
-              ),
-              child: const Center(
-                child: Text(
-                  "Add Challan",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            // Filters Row
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: searchController,
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                      hintStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color.fromRGBO(156, 156, 156, 1)),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color.fromRGBO(156, 156, 156, 1)),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color.fromRGBO(156, 156, 156, 1)),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      hintText: 'Search by Customer Name',
-                    ),
-                    onChanged: (_) => _applyFilters(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color.fromRGBO(0, 140, 192, 1)),
-                  ),
-                  child: DropdownButton<String>(
-                    value: selectedType,
-                    icon: const Icon(Icons.filter_list_outlined),
-                    dropdownColor: Colors.white,
-                    underline: const SizedBox(),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black),
-                    items: const [
-                      DropdownMenuItem(value: 'All', child: Text('All')),
-                      DropdownMenuItem(value: 'Receive', child: Text('Receive')),
-                      DropdownMenuItem(value: 'Delivery', child: Text('Delivery')),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() {
-                        selectedType = value;
-                        _applyFilters();
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _selectDateRange,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color.fromRGBO(0, 140, 192, 1)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Text("Date", style: TextStyle(fontSize: 16)),
-                        SizedBox(width: 4),
-                        Icon(Icons.calendar_today_outlined, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Dynamic Table
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final totalRows = _dataSource.rowCount;
-                final visibleRows = totalRows < _rowsPerPage ? totalRows : _rowsPerPage;
-                final tableHeight = headingHeight + (visibleRows * dataRowHeight) + 70;
-
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  height: tableHeight,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color.fromRGBO(238, 238, 238, 1)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: PaginatedDataTable2(
-                    key: ValueKey(_tableRebuildKey),
-                    source: _dataSource,
-                    rowsPerPage: _rowsPerPage,
-                    availableRowsPerPage: _availableRowsPerPage,
-                    onRowsPerPageChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _rowsPerPage = value);
-                    },
-                    header: null,
-                    wrapInCard: false,
-                    headingRowColor: WidgetStateProperty.all(const Color.fromRGBO(238, 238, 238, 1)),
-                    showFirstLastButtons: true,
-                    headingRowHeight: headingHeight,
-                    dataRowHeight: dataRowHeight,
-                    fixedLeftColumns: 1,
-                    columnSpacing: 12,
-                    horizontalMargin: 12,
-                    minWidth: 600,
-                    columns: const [
-                      DataColumn2(
-                        label: Text('Customer Name', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(0, 140, 192, 1))),
-                      ),
-                      DataColumn2(
-                        fixedWidth: 80,
-                        label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(0, 140, 192, 1))),
-                      ),
-                      DataColumn2(
-                        label: Text('Location', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(0, 140, 192, 1))),
-                      ),
-                      DataColumn2(
-                        fixedWidth: 60,
-                        label: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(0, 140, 192, 1))),
-                      ),
-                      DataColumn2(
-                        fixedWidth: 200,
-                        label: Text('Actions', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromRGBO(0, 140, 192, 1))),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ========== Data Source ==========
-class ChallanDataSource extends DataTableSource {
-  final List<Map<String, dynamic>> _originalData;
-  List<Map<String, dynamic>> _filteredData = [];
-  final ChallanApi _api;
-  final BuildContext context;
-  final VoidCallback onRefresh;
-
-  ChallanDataSource(this._originalData, this._api, this.context, this.onRefresh) {
-    _filteredData = List.from(_originalData);
-  }
-
-  void applyFilters(String query, String type) {
-    _filteredData = _originalData.where((challan) {
-      final matchesName = challan['name'].toString().toLowerCase().contains(query);
-      final matchesType = type == 'All' || challan['type'] == type;
-      return matchesName && matchesType;
-    }).toList();
-    notifyListeners();
-  }
-
-  Future<void> _deleteChallan(String challanId) async {
+  // 🔹 Delete Challan
+  Future<void> _deleteChallan(int challanId) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Challan'),
         content: const Text('Are you sure you want to delete this challan?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -380,128 +854,609 @@ class ChallanDataSource extends DataTableSource {
 
     if (confirmed != true) return;
 
-    final success = await _api.deleteChallan(int.parse(challanId));
+    final success = await challanApi.deleteChallan(challanId);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Challan deleted successfully'), backgroundColor: Colors.green),
-      );
-      onRefresh();
+      showSuccessToast(context, "Challan deleted successfully");
+      _fetchChallans();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete challan'), backgroundColor: Colors.red),
-      );
+      showErrorToast(context, "Failed to delete challan");
     }
   }
 
-  Future<void> _editChallan(String challanId) async {
-    final controller = TextEditingController();
-
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit Customer Name'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Enter new name'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
+  // 🔹 Edit Challan
+  Future<void> _editChallan(Map challanRow) async {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => ChallanScreen(challanId: challanRow),
       ),
     );
-
-    if (newName == null || newName.isEmpty) return;
-
-    try {
-      final challan = await _api.getChallan(int.parse(challanId));
-      challan['customerName'] = newName;
-
-      final success = await _api.updateChallan(int.parse(challanId), challan);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Challan updated successfully'), backgroundColor: Colors.green),
-        );
-        onRefresh();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update challan'), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
-    }
   }
 
-  @override
-  DataRow? getRow(int index) {
-    if (index >= _filteredData.length) return null;
-    final challan = _filteredData[index];
+  Future<void> _generateAndPrintPdf(Map<String, dynamic> challan) async {
+    final pdf = pw.Document();
 
-    return DataRow(
-      cells: [
-        DataCell(Text(challan['name'] ?? '')),
-        DataCell(Text(challan['type'] ?? '')),
-        DataCell(Text(challan['location'] ?? '')),
-        DataCell(Text(challan['qty'] ?? '')),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.edit, size: 18),
-                color: Colors.blue,
-                onPressed: () => _editChallan(challan['id']),
+              pw.Center(
+                child: pw.Text(
+                  "Challan Details",
+                  style: pw.TextStyle(
+                    fontSize: 22,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete, size: 18),
-                color: Colors.red,
-                onPressed: () => _deleteChallan(challan['id']),
+              pw.SizedBox(height: 20),
+              pw.Text(
+                "Customer Name: ${challan['name']}",
+                style: const pw.TextStyle(fontSize: 16),
               ),
-              IconButton(
-                icon: const Icon(Icons.share, size: 18),
-                color: Colors.green,
-                onPressed: () {
-                  final text = '''
-Challan ID: ${challan['id']}
-Customer: ${challan['name']}
-Type: ${challan['type']}
-Location: ${challan['location']}
-Total Qty: ${challan['qty']}
-Date: ${challan['date']}
-                  '''.trim();
-                  Share.share(text, subject: 'Challan Details');
-                },
+              pw.Text(
+                "Type: ${challan['type']}",
+                style: const pw.TextStyle(fontSize: 16),
               ),
-              IconButton(
-                icon: const Icon(Icons.print, size: 18),
-                color: Colors.orange,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Print feature coming soon!')),
-                  );
-                },
+              pw.Text(
+                "Location: ${challan['location']}",
+                style: const pw.TextStyle(fontSize: 16),
+              ),
+              pw.Text(
+                "Quantity: ${challan['qty']}",
+                style: const pw.TextStyle(fontSize: 16),
+              ),
+              pw.Text(
+                "Date: ${challan['date']}",
+                style: const pw.TextStyle(fontSize: 16),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text(
+                  "Generated by Snowcool Trading Co.",
+                  style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
+                ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
+
+    // Save PDF locally
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/challan_${challan['id']}.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    // Open print/share
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+    showSuccessToast(context, "PDF generated successfully");
   }
 
   @override
-  int get rowCount => _filteredData.length;
+  void initState() {
+    super.initState();
+    _fetchChallans();
+  }
+
+  // 🔹 Fetch all challans from API
+  Future<void> _fetchChallans() async {
+    try {
+      final fetchedData = await challanApi.fetchAllChallans();
+      setState(() {
+        _challans = fetchedData;
+        _filteredData = _challans;
+      });
+    } catch (e) {
+      showErrorToast(context, "Failed to load challans: $e");
+    }
+  }
+
+  // 🔹 Apply filters and search
+  void applyFilters(String query, dynamic type) {
+    setState(() {
+      _filteredData = _challans.where((customer) {
+        final matchesName = (customer['name'] as String).toLowerCase().contains(
+          query.toLowerCase(),
+        );
+        final matchesType = type == 'All' || customer['type'] == type;
+        return matchesName && matchesType;
+      }).toList();
+    });
+  }
 
   @override
-  bool get isRowCountApproximate => false;
+  Widget build(BuildContext context) {
+    // final filtered = _filteredCustomers;
+    final totalPages = (_filteredData.length / _rowsPerPage).ceil();
 
-  @override
-  int get selectedRowCount => 0;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Challan Details'),
+        actions: [
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const ChallanScreen()),
+              );
+            },
+            child: Container(
+              height: 30,
+              width: 110,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: const Color.fromRGBO(0, 140, 192, 1),
+              ),
+              child: const Center(
+                child: Text(
+                  "Add Challan",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+
+      body: Column(
+        children: [
+          // 🔍 Filter Section
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 200,
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Search by Name',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: _selectedType,
+                  items: ['All', 'Receive', 'Delivery']
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedType = val!),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color.fromRGBO(0, 140, 192, 1),
+                  ),
+                  onPressed: _pickFromDate,
+                  icon: const Icon(Icons.date_range, color: Colors.white),
+                  label: Text(
+                    _fromDate == null
+                        ? "From Date"
+                        : DateFormat('yyyy-MM-dd').format(_fromDate!),
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color.fromRGBO(0, 140, 192, 1),
+                  ),
+                  onPressed: _pickToDate,
+                  icon: const Icon(Icons.date_range, color: Colors.white),
+                  label: Text(
+                    _toDate == null
+                        ? "To Date"
+                        : DateFormat('yyyy-MM-dd').format(_toDate!),
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                if (_selectedIds.isNotEmpty)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color.fromRGBO(0, 140, 192, 1),
+                    ),
+                    onPressed: () {
+                      showSuccessToast(
+                        context,
+                        "Printing ${_selectedIds.length} selected records...",
+                      );
+                    },
+                    icon: const Icon(Icons.print, color: Colors.white),
+                    label: const Text(
+                      "Print Multiple",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                if (_selectedIds.isNotEmpty)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromRGBO(0, 140, 192, 1),
+                    ),
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Delete Multiple Challans'),
+                          content: Text(
+                            'Are you sure you want to delete ${_selectedIds.length} selected challans?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirmed != true) return;
+
+                      bool allDeleted = true;
+                      for (final id in _selectedIds) {
+                        final success = await challanApi.deleteChallan(id as int);
+                        if (!success) allDeleted = false;
+                      }
+
+                      setState(() {
+                        _selectedIds.clear();
+                      });
+                      await _fetchChallans();
+
+                      if (allDeleted) {
+                        showSuccessToast(
+                          context,
+                          'All selected challans deleted successfully',
+                        );
+                      } else {
+                        showErrorToast(
+                          context,
+                          "Some challans could not be deleted",
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.delete, color: Colors.white),
+                    label: const Text(
+                      "Delete Multiple",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+
+                const SizedBox(width: 10),
+
+                ElevatedButton.icon(
+                  icon: Icon(
+                    _selectionMode ? Icons.visibility_off : Icons.check_box,
+                    color: Colors.white,
+                  ),
+                  label: Text(_selectionMode ? 'Hide Select' : 'Enable Select'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF008CC0),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectionMode = !_selectionMode;
+                      _selectedIds.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  width: 200,
+                  // padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: Colors.grey.shade300),
+                      right: BorderSide(color: Colors.grey.shade300),
+                      top: BorderSide(color: Colors.grey.shade300),
+                      bottom: BorderSide(color: Colors.grey.shade300),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 50,
+                        // color: Colors.teal.shade100,
+                        child: Row(
+                          children: [
+                            if (_selectionMode)
+                            SizedBox(
+                              width: 50,
+                              child: Center(child: Text('✓')),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Name',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Color.fromRGBO(0, 140, 192, 1),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _paginatedCustomers.isEmpty
+                          ? Container(
+                              height: 100,
+                              alignment: Alignment.center,
+                              child: Lottie.asset(
+                                'assets/lottieFile/GAS Cylinder.json',
+                                width: 150,
+                                height: 150,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                ..._paginatedCustomers.map((row) {
+                                  final isSelected = _selectedIds.contains(
+                                    row['id'],
+                                  );
+                                  return Container(
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        if (_selectionMode)
+                                        SizedBox(
+                                          width: 50,
+                                          child: Checkbox(
+                                            value: isSelected,
+                                            onChanged: (_) =>
+                                                _toggleSelect(row['id']),
+                                          ),
+                                        ),
+                                        Expanded(child: Text(row['name'])),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Scrollable Other Columns
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 700,
+                    child: Column(
+                      children: [
+                        // Header Row
+                        Container(
+                          height: 50,
+                          // color: Colors.teal.shade100,
+                          child: Row(
+                            children: const [
+                              SizedBox(
+                                width: 100,
+                                child: Center(
+                                  child: Text(
+                                    'Type',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromRGBO(0, 140, 192, 1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 200,
+                                child: Center(
+                                  child: Text(
+                                    'Location',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromRGBO(0, 140, 192, 1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 50,
+                                child: Center(
+                                  child: Text(
+                                    'Qty',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromRGBO(0, 140, 192, 1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 150,
+                                child: Center(
+                                  child: Text(
+                                    'Date',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromRGBO(0, 140, 192, 1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'Actions',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color.fromRGBO(0, 140, 192, 1),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Data Rows
+                        ..._paginatedCustomers.map((row) {
+                          return Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                SizedBox(width: 100, child: Text(row['type'])),
+                                SizedBox(
+                                  width: 200,
+                                  child: Text(row['location']),
+                                ),
+                                SizedBox(
+                                  width: 50,
+                                  child: Center(child: Text(row['qty'])),
+                                ),
+                                SizedBox(
+                                  width: 150,
+                                  child: Center(child: Text(row['date'])),
+                                ),
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          color: Colors.blue,
+                                        ),
+                                        onPressed: () {
+                                          _editChallan(row);
+                                          showSuccessToast(
+                                            context,
+                                            "Editing Challan...",
+                                          );
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                        ),
+                                        onPressed: () {
+                                          _deleteChallan(row['id']);
+                                          setState(() {
+                                            _customers.removeWhere(
+                                              (c) => c['id'] == row['id'],
+                                            );
+                                          });
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.share,
+                                          color: Colors.green,
+                                        ),
+                                        onPressed: () {
+                                          // ScaffoldMessenger.of(
+                                          //   context,
+                                          // ).showSnackBar(
+                                          //   SnackBar(
+                                          //     content: Text(
+                                          //       "Share ${row['name']}",
+                                          //     ),
+                                          //   ),
+                                          // );
+                                          Share.share(
+                                            'Check this challan detail',
+                                          );
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.save_outlined,
+                                          color: Colors.deepPurple,
+                                        ),
+                                        onPressed: () {
+                                          _generateAndPrintPdf(row);
+                                          showSuccessToast(
+                                            context,
+                                            'Printing PDF...',
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Pagination Footer
+          Container(
+            color: Colors.grey.shade100,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: _currentPage > 0
+                      ? () => setState(() => _currentPage--)
+                      : null,
+                ),
+                Text('Page ${_currentPage + 1} of $totalPages'),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  onPressed: _currentPage < totalPages - 1
+                      ? () => setState(() => _currentPage++)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

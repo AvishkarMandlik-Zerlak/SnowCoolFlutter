@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/addinventoryscreen.dart';
 import 'package:snow_trading_cool/screens/profile_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart'; // Import for User Create
+import 'package:snow_trading_cool/screens/view_customer_screen.dart'; // Changed import to ViewCustomerScreen
 import 'package:snow_trading_cool/screens/view_user_screen.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/services/profile_api.dart'; // Import for profile check
@@ -22,6 +23,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final LogoutApi _logoutApi = LogoutApi();
   bool _isLoggingOut = false;
+  bool _showCustomerSubMenu = false;
+  String _userRole = 'Employee'; // Default role
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserRole();
+  }
+
+  Future<void> _fetchUserRole() async {
+    final token = TokenManager().getToken();
+    if (token == 'demo-token-local-only') {
+      // Handle local demo login
+      final username = TokenManager().getUsername(); // You need to implement this in TokenManager
+      setState(() {
+        _userRole = username == 'admin' ? 'Admin' : 'Employee';
+      });
+      return;
+    }
+
+    final profileApi = ProfileApi();
+    try {
+      final response = await profileApi.getProfile();
+      if (response.success && response.data != null) {
+        setState(() {
+          _userRole = response.data!['role'] ?? 'Employee';
+        });
+      }
+    } catch (e) {
+      print('Failed to fetch user role: $e');
+    }
+  }
 
   Future<void> _handleLogout() async {
     setState(() {
@@ -239,64 +272,119 @@ class _HomeScreenState extends State<HomeScreen> {
                               width: panelWidth,
                               height: double.infinity,
                               child: SafeArea(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 8),
-                                    ListTile(
-                                      title: const Text('Challan'),
-                                      trailing: const Icon(Icons.add),
-                                      onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const ChallanScreen(),
+                                child: StatefulBuilder(
+                                  builder: (BuildContext context, StateSetter setState) {
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const SizedBox(height: 8),
+                                        ListTile(
+                                          title: const Text('Challan'),
+                                          trailing: const Icon(Icons.add),
+                                          onTap: () {
+                                            Navigator.of(ctx).pop();
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => const ChallanScreen(),
+                                              ),
+                                            );
+                                          },
+                                        ),
+
+                                        const Divider(height: 1),
+                                        ListTile(
+                                          title: const Text('Customers'),
+                                          trailing: Icon(_showCustomerSubMenu ? Icons.remove : Icons.add),
+                                          onTap: () {
+                                            setState(() {
+                                              _showCustomerSubMenu = !_showCustomerSubMenu;
+                                            });
+                                          },
+                                        ),
+                                        if (_showCustomerSubMenu) ...[
+                                          ListTile(
+                                            title: const Text('Create Customer'),
+                                            leading: const SizedBox(width: 24), // Indent
+                                            trailing: const Icon(Icons.add),
+                                            onTap: () {
+                                              Navigator.of(ctx).pop(); // Close the drawer
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => const CreateCustomerScreen(),
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
-                                    ),
-                                    const Divider(height: 1),
-                                    ListTile(
-                                      title: const Text('Customer'),
-                                      trailing: const Icon(Icons.add),
-                                      onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const CreateCustomerScreen(),
+                                          ListTile(
+                                            title: const Text('View Customers'),
+                                            leading: const SizedBox(width: 24), // Indent
+                                            trailing: const Icon(Icons.add),
+                                            onTap: () {
+                                              Navigator.of(ctx).pop(); // Close the drawer
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => const ViewCustomerScreenFixed(), // Changed to ViewCustomerScreen
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
-                                    ),
-                                    const Divider(height: 1),
-                                    ListTile(
-                                      title: const Text('Items/Goods'),
-                                      trailing: const Icon(Icons.add),
-                                      onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const Addinventoryscreen(),
+                                        ],
+                                        const Divider(height: 1),
+                                        ListTile(
+                                          title: Text(
+                                            'Items/Goods',
+                                            style: TextStyle(
+                                              color: _userRole == 'Admin' ? Colors.black : Colors.grey,
+                                            ),
                                           ),
-                                        );
-                                      },
-                                    ),
-                                    const Spacer(),
-                                    const Divider(height: 1),
-                                    ListTile(
-                                      title: const Text('Logout'),
-                                      leading: const Icon(
-                                        Icons.logout,
-                                        color: Colors.red,
-                                      ),
-                                      textColor: Colors.red,
-                                      onTap: () {
-                                        Navigator.of(ctx).pop();
-                                        _showLogoutConfirmation();
-                                      },
-                                    ),
-                                    const SizedBox(height: 16),
-                                  ],
+                                          trailing: Icon(
+                                            Icons.add,
+                                            color: _userRole == 'Admin' ? Colors.black : Colors.grey,
+                                          ),
+                                          onTap: () {
+                                            if (_userRole == 'Admin') {
+                                              Navigator.of(ctx).pop();
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => const Addinventoryscreen(),
+                                                ),
+                                              );
+                                            } else {
+                                              // Show a popup for non-admin users
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text('Access Denied'),
+                                                  content: const Text('This feature is available for admins only.'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: const Text('OK'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }
+                                          },
+                                        ),
+                                        const Spacer(),
+                                        const Divider(height: 1),
+                                        ListTile(
+                                          title: const Text('Logout'),
+                                          leading: const Icon(
+                                            Icons.logout,
+                                            color: Colors.red,
+                                          ),
+                                          textColor: Colors.red,
+                                          onTap: () {
+                                            Navigator.of(ctx).pop();
+                                            _showLogoutConfirmation();
+                                          },
+                                        ),
+                                        const SizedBox(height: 16),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ),
                             ),
@@ -588,17 +676,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: 'view_customer',
+                value: 'customers',
                 child: ListTile(
                   leading: const Icon(Icons.person),
-                  title: const Text('View Customer'),
+                  title: const Text('Customers'),
                 ),
               ),
               PopupMenuItem(
                 value: 'items',
+                enabled: _userRole == 'Admin',
                 child: ListTile(
-                  leading: const Icon(Icons.inventory_2),
-                  title: const Text('Items/Goods'),
+                  leading: Icon(
+                    Icons.inventory_2,
+                    color: _userRole == 'Admin' ? Colors.black : Colors.grey,
+                  ),
+                  title: Text(
+                    'Items/Goods',
+                    style: TextStyle(
+                      color: _userRole == 'Admin' ? Colors.black : Colors.grey,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -612,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return;
           }
 
-          if (selected == 'view_customer') {
+          if (selected == 'customers') {
             final sub = await showMenu<String>(
               context: context,
               position: RelativeRect.fromLTRB(left, top - 120, 16, 16),
@@ -621,6 +718,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   value: 'create_customer',
                   child: Text('Create Customer'),
                 ),
+                const PopupMenuItem(
+                  value: 'view_customers',
+                  child: Text('View Customers'),
+                ),
               ],
             );
             if (sub == 'create_customer') {
@@ -628,13 +729,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const CreateCustomerScreen()),
               );
             }
+            if (sub == 'view_customers') {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ViewCustomerScreenFixed()), // Changed to ViewCustomerScreenFixed
+              );
+            }
             return;
           }
 
           if (selected == 'items') {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const Addinventoryscreen()),
-            );
+            if (_userRole == 'Admin') {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const Addinventoryscreen()),
+              );
+            }
             return;
           }
         },

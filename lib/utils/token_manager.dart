@@ -9,6 +9,7 @@ class TokenManager {
   TokenManager._internal();
 
   String? _token;
+  String? _username;
 
   /// Store the authentication token
   void setToken(String? token) {
@@ -20,9 +21,20 @@ class TokenManager {
     return _token;
   }
 
-  /// Clear the stored token (for logout)
+  /// Store the username
+  void setUsername(String? username) {
+    _username = username;
+  }
+
+  /// Get the current username
+  String? getUsername() {
+    return _username;
+  }
+
+  /// Clear the stored token and username (for logout)
   void clearToken() {
     _token = null;
+    _username = null;
   }
 
   /// Check if user is authenticated
