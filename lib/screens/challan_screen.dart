@@ -1,8 +1,9 @@
+// challan_screen.dart - FULLY FIXED & FINAL VERSION
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:snow_trading_cool/services/challan_api.dart';
 import 'package:snow_trading_cool/services/customer_api.dart';
-import 'package:snow_trading_cool/services/goods_api.dart'; 
+import 'package:snow_trading_cool/services/goods_api.dart';
 
 class ChallanScreen extends StatefulWidget {
   const ChallanScreen({super.key});
@@ -14,7 +15,7 @@ class ChallanScreen extends StatefulWidget {
 class _ChallanScreenState extends State<ChallanScreen> {
   final ChallanApi _api = ChallanApi();
   final CustomerApi _customerApi = CustomerApi();
-  final GoodsApi _goodsApi = GoodsApi(); // <-- NEW
+  final GoodsApi _goodsApi = GoodsApi();
 
   // ---------- Controllers ----------
   final TextEditingController customerNameController = TextEditingController();
@@ -55,16 +56,14 @@ class _ChallanScreenState extends State<ChallanScreen> {
     dateController = TextEditingController(
       text: DateTime.now().toIso8601String().split('T').first,
     );
-    _loadGoods(); // Load dynamic products
+    _loadGoods();
   }
 
-  // ---------- Load Goods ----------
   Future<void> _loadGoods() async {
     final list = await _goodsApi.getAllGoods();
     setState(() {
       goods = list;
       _goodsLoading = false;
-      // Initialize controllers for each good
       for (final g in goods) {
         _qtyControllers[g.name] = TextEditingController();
         _srNoControllers[g.name] = TextEditingController();
@@ -87,9 +86,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
       });
       return;
     }
-
     if (_loading) return;
-
     setState(() => _loading = true);
 
     try {
@@ -200,7 +197,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
     });
   }
 
-  // ---------- SAVE ----------
+  // ---------- SAVE CHALLAN (NOW CALLS ALL API FIELDS) ----------
   Future<void> _saveChallanData() async {
     if (_saving) return;
     setState(() => _saving = true);
@@ -245,19 +242,19 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
 
     // Basic validation
-    if (customerName.isEmpty) return _showError('Enter customer name');
-    if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(customerName)) return _showError('Customer name: letters only');
-    if (transporter.isEmpty) return _showError('Enter transporter name');
-    if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(transporter)) return _showError('Transporter: letters only');
-    if (vehicleNumber.isEmpty) return _showError('Enter vehicle number');
+    if (customerName.isEmpty) { _showError('Enter customer name'); setState(() => _saving = false); return; }
+    if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(customerName)) { _showError('Customer name: letters only'); setState(() => _saving = false); return; }
+    if (transporter.isEmpty) { _showError('Enter transporter name'); setState(() => _saving = false); return; }
+    if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(transporter)) { _showError('Transporter: letters only'); setState(() => _saving = false); return; }
+    if (vehicleNumber.isEmpty) { _showError('Enter vehicle number'); setState(() => _saving = false); return; }
     final vp1 = RegExp(r'^[A-Z]{2}\d{1,2}[A-Z]{1,2}\d{4}$');
     final vp2 = RegExp(r'^\d{2}BH\d{4}[A-Z]{1,2}$');
-    if (!(vp1.hasMatch(vehicleNumber) || vp2.hasMatch(vehicleNumber))) return _showError('Invalid vehicle number');
-    if (location.isEmpty) return _showError('Enter location');
-    if (selectedCustomerId == null) return _showError('Select a customer');
+    if (!(vp1.hasMatch(vehicleNumber) || vp2.hasMatch(vehicleNumber))) { _showError('Invalid vehicle number'); setState(() => _saving = false); return; }
+    if (location.isEmpty) { _showError('Enter location'); setState(() => _saving = false); return; }
+    if (selectedCustomerId == null) { _showError('Select a customer'); setState(() => _saving = false); return; }
     final mobileDigits = mobileNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    if (mobileDigits.length != 10) return _showError('Mobile number must be 10 digits');
-    if (!RegExp(r'^[5-9]').hasMatch(mobileDigits)) return _showError('Mobile number must start with 5–9');
+    if (mobileDigits.length != 10) { _showError('Mobile number must be 10 digits'); setState(() => _saving = false); return; }
+    if (!RegExp(r'^[5-9]').hasMatch(mobileDigits)) { _showError('Mobile number must start with 5–9'); setState(() => _saving = false); return; }
 
     // ---------- Dynamic Product Validation ----------
     final List<Map<String, dynamic>> items = [];
@@ -294,19 +291,19 @@ class _ChallanScreenState extends State<ChallanScreen> {
 
     setState(() => _loading = true);
     try {
-      final success = await _api.challanData(
-        selectedCustomerId!,
-        customerName,
-        type,
-        location,
-        transporter,
-        vehicleNumber,
-        driverName,
-        driverNumber,
-        mobileNumber,
-        // Pass dummy values for old static fields (will be ignored in API)
-        '', '', '', '', '', '', '', '',
-        challanDate,
+      // NOW CALLING ALL REQUIRED FIELDS INCLUDING challanNumber & date
+      final success = await _api.createChallan(
+        customerId: selectedCustomerId!,
+        customerName: customerName,
+        challanType: type,
+        location: location,
+        transporter: transporter,
+        vehicleNumber: vehicleNumber,
+        driverName: driverName,
+        driverNumber: driverNumber,
+        contactNumber: mobileDigits,
+        items: items,
+        date: challanDate, // PASSED
       );
 
       if (success) {
@@ -314,6 +311,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
           const SnackBar(content: Text('Challan saved successfully!'), backgroundColor: Colors.green),
         );
         _clearAllFields();
+      } else {
+        _showError('Failed to save challan');
       }
     } catch (e) {
       _showError('Save failed: $e');
@@ -325,7 +324,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
   }
 
-  // ---------- Reset ----------
   void _clearAllFields() {
     setState(() {
       _loading = false;
@@ -340,7 +338,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
       customerEmailController.clear();
       customerAddressController.clear();
 
-      // Clear dynamic product fields
       for (final ctrl in _qtyControllers.values) ctrl.clear();
       for (final ctrl in _srNoControllers.values) ctrl.clear();
 
@@ -362,15 +359,11 @@ class _ChallanScreenState extends State<ChallanScreen> {
     customerEmailController.dispose();
     customerAddressController.dispose();
     dateController.dispose();
-
-    // Dispose dynamic controllers
     for (final ctrl in _qtyControllers.values) ctrl.dispose();
     for (final ctrl in _srNoControllers.values) ctrl.dispose();
-
     super.dispose();
   }
 
-  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -472,7 +465,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       enabled: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildProductTable(), // Dynamic now
+                    _buildProductTable(),
                   ],
                 ),
               ),
@@ -559,26 +552,18 @@ class _ChallanScreenState extends State<ChallanScreen> {
     );
   }
 
-  // ---------- Dynamic Product Table ----------
   Widget _buildProductTable() {
     if (_goodsLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()));
     }
-
     if (goods.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text('No products available', style: TextStyle(color: Colors.red)),
-      );
+      return const Padding(padding: EdgeInsets.all(16), child: Text('No products available', style: TextStyle(color: Colors.red)));
     }
 
     return Container(
       decoration: BoxDecoration(border: Border.all(color: const Color.fromRGBO(238, 238, 238, 1)), borderRadius: BorderRadius.circular(8)),
       child: Table(
-        columnWidths: const {0: FlexColumnWidth(0.7), 1: FlexColumnWidth(0.5),},
+        columnWidths: const {0: FlexColumnWidth(2.5), 1: FlexColumnWidth(1.5), 2: FlexColumnWidth(1.5)},
         children: [
           TableRow(
             decoration: const BoxDecoration(color: Color.fromRGBO(238, 238, 238, 1), borderRadius: BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8))),
@@ -653,7 +638,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
   }
 }
 
-// Uppercase formatter
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
