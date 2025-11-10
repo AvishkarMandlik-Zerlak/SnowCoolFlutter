@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/customer_api.dart'; // Import for customer API
 
 class CreateCustomerScreen extends StatefulWidget {
@@ -34,29 +35,14 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
       );
 
       if (response.success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Customer created successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        showSuccessToast(context, "Customer created successfully!");
         Navigator.pop(context); // Back to previous screen
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ?? 'Failed to create customer'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showErrorToast(context, "Failed to create customer: ${response.message}");
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        showErrorToast(context, "Error creating customer: ${e.toString()}");
       }
     } finally {
       if (mounted) {

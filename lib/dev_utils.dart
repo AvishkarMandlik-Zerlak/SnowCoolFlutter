@@ -5,7 +5,7 @@ class DevUtils {
   static Future<void> createDemoAdmin() async {
     final userApi = UserApi();
     try {
-      final response = await userApi.createUser(
+      final response = await userApi.createOrUpdateUser(
         username: 'admin',
         password: 'password',
         role: 'Admin',

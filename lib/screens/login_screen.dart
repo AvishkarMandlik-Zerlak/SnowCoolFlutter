@@ -1,11 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../utils/constants.dart';
-import '../utils/token_manager.dart';
 import 'home_screen.dart';
 import '../services/login_api.dart';
 
@@ -37,9 +37,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (username.isEmpty || password.isEmpty) {
-      showErrorToast(context, "Please fill username and password");
+      showWarningToast(context, "Please enter both username and password");
       return;
     }
+
+    // Close keyboard on login press to avoid overflow with error message
+    FocusScope.of(context).unfocus();
+
     // Reset previous validation state
     setState(() {
       _usernameInvalid = false;
@@ -50,15 +54,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Demo credentials check (local demo) — adjust these values as needed.
     const demoUsername = 'demo';
-    const demoPassword = 'demo123';    
+    const demoPassword = 'demo123';
     const adminUsername = 'admin';
     const adminPassword = 'password';
 
     // Quick client-side demo validation: if matches demo creds, navigate locally.
-    if ((username == demoUsername && password == demoPassword) || (username == adminUsername && password == adminPassword)) {
+    if ((username == demoUsername && password == demoPassword) ||
+        (username == adminUsername && password == adminPassword)) {
       // Set a demo token for demo mode
       TokenManager().setToken('demo-token-local-only');
-      TokenManager().setUsername(username);
+      TokenManager().setRole(username);
 
       setState(() => _loading = false);
       // Ensure widget is still mounted before navigating to avoid scheduling
@@ -75,14 +80,16 @@ class _LoginScreenState extends State<LoginScreen> {
     // If demo creds didn't match, show error for demo or call backend to validate credentials.
 
     // Try API login first, fallback to demo if network fails
-     try {
+    try {
       final resp = await _api.login(username, password);
+      print(resp);
 
       if (resp.success) {
         // Store the token for future API calls
         if (resp.token != null) {
           TokenManager().setToken(resp.token);
-          TokenManager().setUsername(username);
+          TokenManager().setRole(username);
+          TokenManager().setId(resp.id as int?);
           print('Token stored: ${resp.token}');
         }
 
@@ -115,8 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         });
       }
-    }  catch (e) {
-      // Network error or API unavailable - show professional fallback error
+    } catch (e) {
+      // *** ERROR CASE (Network): Delay add karo yahan ***
       await Future.delayed(
         const Duration(milliseconds: 300),
       ); // Same delay for catch
@@ -131,7 +138,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
- 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;

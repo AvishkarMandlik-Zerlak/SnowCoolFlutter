@@ -17,9 +17,7 @@ class ChallanApi {
   // -------------------------------------------------------------------------
   Map<String, String> _getHeaders() {
     final token = _tokenManager.getToken();
-    final headers = {
-      'Content-Type': 'application/json',
-    };
+    final headers = {'Content-Type': 'application/json'};
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -51,16 +49,20 @@ class ChallanApi {
         'transporter': transporter,
         'vehicleNumber': vehicleNumber,
         'driverName': driverName,
-        'driverNumber': driverNumber,   // <-- EXACT KEY
+        'driverNumber': driverNumber, // <-- EXACT KEY
         'contactNumber': contactNumber,
-        'date': date,                   // <-- EXACT KEY
-        'challanNumber': 'AUTO',        // <-- EXACT KEY (backend will generate)
-        'items': items.map((item) => {
-              'name': item['product'],
-              'qty': item['quantity'],
-              'srNo': item['serialNumber'],
-              'batchRef': item['serialNumber'], // required by backend
-            }).toList(),
+        'date': date, // <-- EXACT KEY
+        'challanNumber': 'AUTO', // <-- EXACT KEY (backend will generate)
+        'items': items
+            .map(
+              (item) => {
+                'name': item['product'],
+                'qty': item['quantity'],
+                'srNo': item['serialNumber'],
+                'batchRef': item['serialNumber'], // required by backend
+              },
+            )
+            .toList(),
       };
 
       debugPrint('Sending Challan Payload: ${jsonEncode(body)}');
@@ -89,27 +91,30 @@ class ChallanApi {
   // FETCH ALL CHALLANS
   // -------------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> fetchAllChallans() async {
-    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     final url = Uri.parse('$normalizedBase/api/v1/challans/getAllChallan');
 
     try {
-      final resp = await http.get(url, headers: _getHeaders()).timeout(const Duration(seconds: 10));
+      final resp = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 10));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final List<dynamic> jsonList = jsonDecode(resp.body);
         return jsonList.map((j) {
           final String typeStr = j['challanType'] ?? 'RECEIVE';
-          final String displayType = typeStr.substring(0, 1) + typeStr.substring(1).toLowerCase();
+          final String displayType =
+              typeStr.substring(0, 1) + typeStr.substring(1).toLowerCase();
 
           // ---- Safe qty sum ----
           final List<dynamic>? itemsList = j['items'] as List<dynamic>?;
-          final int totalQty = itemsList?.fold<int>(
-                0,
-                (int sum, dynamic item) {
-                  final dynamic qty = item['qty'];
-                  return sum + ((qty is int) ? qty : 0);
-                },
-              ) ??
+          final int totalQty =
+              itemsList?.fold<int>(0, (int sum, dynamic item) {
+                final dynamic qty = item['qty'];
+                return sum + ((qty is int) ? qty : 0);
+              }) ??
               0;
 
           return {
@@ -134,11 +139,15 @@ class ChallanApi {
   // GET SINGLE CHALLAN
   // -------------------------------------------------------------------------
   Future<Map<String, dynamic>> getChallan(int id) async {
-    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     final url = Uri.parse('$normalizedBase/api/v1/challans/getByChallanId/$id');
 
     try {
-      final resp = await http.get(url, headers: _getHeaders()).timeout(const Duration(seconds: 10));
+      final resp = await http
+          .get(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 10));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return jsonDecode(resp.body) as Map<String, dynamic>;
@@ -154,16 +163,33 @@ class ChallanApi {
   // -------------------------------------------------------------------------
   // UPDATE CHALLAN
   // -------------------------------------------------------------------------
-  Future<bool> updateChallan(int id, Map<String, dynamic> dto) async {
-    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/challans/updateChallanById/$id');
+  Future<bool> updateChallan(
+    // Map<String, dynamic> dto, 
+    {
+    required int challanId,
+    required int customerId,
+    required String customerName,
+    required String challanType,
+    required String location,
+    required String transporter,
+    required String vehicleNumber,
+    required String driverName,
+    required String driverNumber,
+    required String contactNumber,
+    required List<Map<String, dynamic>> items,
+    required String date,
+  }) async {
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/challans/updateChallanById/$challanId',
+    );
 
     try {
-      final resp = await http.put(
-        url,
-        headers: _getHeaders(),
-        body: jsonEncode(dto),
-      ).timeout(const Duration(seconds: 10));
+      final resp = await http
+          .put(url, headers: _getHeaders(), body: jsonEncode(items))
+          .timeout(const Duration(seconds: 10));
 
       return resp.statusCode >= 200 && resp.statusCode < 300;
     } catch (e) {
@@ -176,11 +202,17 @@ class ChallanApi {
   // DELETE CHALLAN
   // -------------------------------------------------------------------------
   Future<bool> deleteChallan(int id) async {
-    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/challans/deleteChallanById/$id');
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/challans/deleteChallanById/$id',
+    );
 
     try {
-      final resp = await http.delete(url, headers: _getHeaders()).timeout(const Duration(seconds: 10));
+      final resp = await http
+          .delete(url, headers: _getHeaders())
+          .timeout(const Duration(seconds: 10));
 
       return resp.statusCode >= 200 && resp.statusCode < 300;
     } catch (e) {

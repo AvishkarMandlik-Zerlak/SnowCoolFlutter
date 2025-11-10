@@ -9,8 +9,10 @@ class LoginResponse {
   final String? message; // human readable message
   final String? field; // 'username' | 'password' | null
   final String? token;
+  final int? id;
+  final String? role;
 
-  LoginResponse({required this.success, this.message, this.field, this.token});
+  LoginResponse({required this.success, this.message, this.field, this.token,  this.id, this.role,});
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
@@ -18,6 +20,8 @@ class LoginResponse {
       message: json['message']?.toString(),
       field: json['field']?.toString(),
       token: json['token']?.toString(),
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()),
+      role: json['role']?.toString(),
     );
   }
 }

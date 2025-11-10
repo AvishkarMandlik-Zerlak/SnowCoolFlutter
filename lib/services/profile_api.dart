@@ -116,11 +116,11 @@ class ProfileApi {
   }
 
   /// Fetches the current user's profile and returns a [ProfileResponse].
-  Future<ProfileResponse> getProfile() async {
+  Future<ProfileResponse> getProfile(int? profileId) async {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final url = Uri.parse('$normalizedBase/profile'); // Assuming endpoint
+    final url = Uri.parse('$normalizedBase/api/v1/profiles/getById/$profileId'); // Assuming endpoint
 
     // Debug prints (ok during development)
     log('ProfileApi get: GET $url');
@@ -134,6 +134,8 @@ class ProfileApi {
       final resp = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
+
+      print(resp); 
 
       log('ProfileApi get: status=${resp.statusCode}');
       log('ProfileApi get: response=${resp.body}');

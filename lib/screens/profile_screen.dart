@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/setting_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart';
+import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/profile_api.dart';
 
@@ -27,7 +28,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
     try {
-      final response = await _profileApi.getProfile();
+
+      print('ProfileScreen: Loading profile for user id=${TokenManager().getId()}');    
+      final response = await _profileApi.getProfile(TokenManager().getId());
+
 
       if (response.success && response.data != null) {
         setState(() {
@@ -37,13 +41,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } else {
         setState(() => _isLoading = false);
         if (mounted) {
-          showWarningToast(context, "Profile not found");
+          showWarningToast(context, 'Profile not Found');
         }
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        showErrorToast(context, "Error loading profile: $e");
+        showWarningToast(context, "Using demo user data due to error: $e");
       }
     }
   }
@@ -51,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _updateProfile() async {
     setState(() => _isEditing = !_isEditing);
     if (!_isEditing) {
-      showSuccessToast(context, "Profile updated successfully");
+      showSuccessToast(context, "Profile updated successfully!");
     }
   }
 

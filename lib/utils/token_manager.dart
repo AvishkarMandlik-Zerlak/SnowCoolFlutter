@@ -1,3 +1,4 @@
+
 /// Simple token manager to store and retrieve authentication tokens
 class TokenManager {
   static final TokenManager _instance = TokenManager._internal();
@@ -9,7 +10,8 @@ class TokenManager {
   TokenManager._internal();
 
   String? _token;
-  String? _username;
+  int? _id;        // Added: user id (Long)
+  String? _role;    // Changed: username to role
 
   /// Store the authentication token
   void setToken(String? token) {
@@ -21,20 +23,31 @@ class TokenManager {
     return _token;
   }
 
-  /// Store the username
-  void setUsername(String? username) {
-    _username = username;
+  /// Store the user id
+  void setId(int? id) {
+    _id = id;
   }
 
-  /// Get the current username
-  String? getUsername() {
-    return _username;
+  /// Get the current user id
+  int? getId() {
+    return _id;
   }
 
-  /// Clear the stored token and username (for logout)
+  /// Store the user role
+  void setRole(String? role) {
+    _role = role;
+  }
+
+  /// Get the current user role
+  String? getRole() {
+    return _role;
+  }
+
+  /// Clear the stored token, id and role (for logout)
   void clearToken() {
     _token = null;
-    _username = null;
+    _id = null;
+    _role = null;
   }
 
   /// Check if user is authenticated

@@ -8,6 +8,7 @@ import 'package:snow_trading_cool/screens/view_user_screen.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/services/profile_api.dart'; // Import for profile check
 import 'package:snow_trading_cool/screens/view_challan.dart';
+import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import 'challan_screen.dart';
 import 'create_customer_screen.dart';
 import 'login_screen.dart';
@@ -36,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = TokenManager().getToken();
     if (token == 'demo-token-local-only') {
       // Handle local demo login
-      final username = TokenManager().getUsername(); // You need to implement this in TokenManager
+      final username = TokenManager().getRole(); // You need to implement this in TokenManager
       setState(() {
         _userRole = username == 'admin' ? 'Admin' : 'Employee';
       });
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final profileApi = ProfileApi();
     try {
-      final response = await profileApi.getProfile();
+      final response = await profileApi.getProfile(TokenManager().getId());
       if (response.success && response.data != null) {
         setState(() {
           _userRole = response.data!['role'] ?? 'Employee';
@@ -72,14 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Show appropriate message based on response
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ?? 'Logged out successfully'),
-            backgroundColor: response.success ? Colors.green : Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-        
+        showSuccessToast(context, "Logged out successfully");
         // Always navigate to login for security (whether API succeeded or not)
         Navigator.pushAndRemoveUntil(
           context,
@@ -95,13 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
       TokenManager().clearToken();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged out locally due to network error'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        showWarningToast(context, "Logged out locally due to network error");
 
         // Always navigate to login for security
         Navigator.pushAndRemoveUntil(
@@ -130,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool> _checkProfileExists() async {
     final ProfileApi profileApi = ProfileApi();
     try {
-      final response = await profileApi.getProfile(); // Real API call
+      final response = await profileApi.getProfile(TokenManager().getId()); // Real API call
       return response.success && response.data != null;
     } catch (e) {
       print('Profile check error: $e');
