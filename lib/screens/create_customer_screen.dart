@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
-import '../services/customer_api.dart'; // Import for customer API
+import '../services/customer_api.dart';
+import 'view_customer_screen.dart';
 
 class CreateCustomerScreen extends StatefulWidget {
   const CreateCustomerScreen({super.key});
@@ -19,36 +21,126 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
   bool _isLoading = false;
   final CustomerApi _api = CustomerApi();
 
-  Future<void> _submitCustomer() async {
-    if (!_formKey.currentState!.validate()) return;
+  // Error messages state
+  String? _nameError;
+  String? _mobileError;
+  String? _emailError;
+  String? _addressError;
 
+  // Mobile validator
+  String? _validateMobile(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter mobile number';
+    }
+    final cleaned = value.trim();
+    if (cleaned.length != 10) {
+      return 'Mobile number must be exactly 10 digits';
+    }
+    if (!RegExp(r'^[5-9]\d{9}$').hasMatch(cleaned)) {
+      return 'Mobile must start with 5, 6, 7, 8, or 9';
+    }
+    return null;
+  }
+
+  // Email validator
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter email';
+    }
+    final email = value.trim();
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  // Auto-convert email to lowercase
+  void _onEmailChanged(String value) {
+    final lower = value.toLowerCase();
+    if (value != lower) {
+      _emailController.value = TextEditingValue(
+        text: lower,
+        selection: TextSelection.collapsed(offset: lower.length),
+      );
+    }
+    _updateEmailError(lower);
+  }
+
+  void _updateNameError(String value) {
     setState(() {
-      _isLoading = true;
+      _nameError = value.trim().isEmpty ? 'Please enter customer name' : null;
     });
+  }
+
+  void _updateMobileError(String value) {
+    setState(() {
+      _mobileError = _validateMobile(value);
+    });
+  }
+
+  void _updateEmailError(String value) {
+    setState(() {
+      _emailError = _validateEmail(value);
+    });
+  }
+
+  void _updateAddressError(String value) {
+    setState(() {
+      _addressError = value.trim().isEmpty ? 'Please enter address' : null;
+    });
+  }
+
+  bool _isFormValid() {
+    return _nameError == null &&
+        _mobileError == null &&
+        _emailError == null &&
+        _addressError == null &&
+        _nameController.text.trim().isNotEmpty &&
+        _mobileController.text.trim().isNotEmpty &&
+        _emailController.text.trim().isNotEmpty &&
+        _addressController.text.trim().isNotEmpty;
+  }
+
+  Future<void> _submitCustomer() async {
+    if (!_isFormValid()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fix the errors above')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
       final response = await _api.createCustomer(
-        name: _nameController.text,
-        mobile: _mobileController.text,
-        email: _emailController.text,
-        address: _addressController.text,
+        name: _nameController.text.trim(),
+        mobile: _mobileController.text.trim(),
+        email: _emailController.text.trim(),
+        address: _addressController.text.trim(),
       );
 
-      if (response.success && mounted) {
+      if (!mounted) return;
+
+      if (response.success == true) {
         showSuccessToast(context, "Customer created successfully!");
-        Navigator.pop(context); // Back to previous screen
-      } else if (mounted) {
-        showErrorToast(context, "Failed to create customer: ${response.message}");
+        // Navigate to the View Customers screen after successful creation
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ViewCustomerScreenFixed()),
+        );
+      } else {
+        showErrorToast(
+          context,
+          response.message ?? "Failed to create customer.",
+        );
       }
     } catch (e) {
-      if (mounted) {
-        showErrorToast(context, "Error creating customer: ${e.toString()}");
-      }
+      if (!mounted) return;
+      showErrorToast(context, "Network error: ${e.toString()}");
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -86,74 +178,117 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
         ),
       ),
       body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24, vertical: 16),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Add a new customer to the system',
-                  style: GoogleFonts.inter(
-                    fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 24,
+          vertical: 16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add a new customer to the system',
+                style: GoogleFonts.inter(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
                 ),
-                const SizedBox(height: 24),
-                _buildTextField('Customer Name', _nameController, Icons.person, true),
-                const SizedBox(height: 16),
-                _buildTextField('Mobile', _mobileController, Icons.phone, true),
-                const SizedBox(height: 16),
-                _buildTextField('Email', _emailController, Icons.email, true),
-                const SizedBox(height: 16),
-                _buildTextField('Address', _addressController, Icons.location_on, true, isMultiLine: true),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submitCustomer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromRGBO(0, 140, 192, 1),
-                      padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+              ),
+              const SizedBox(height: 24),
+
+              // Name Field
+              _buildTextField(
+                label: 'Customer Name',
+                controller: _nameController,
+                icon: Icons.person,
+                errorText: _nameError,
+                onChanged: _updateNameError,
+              ),
+              const SizedBox(height: 16),
+
+              // Mobile Field
+              _buildTextField(
+                label: 'Mobile',
+                controller: _mobileController,
+                icon: Icons.phone,
+                keyboardType: TextInputType.phone,
+                errorText: _mobileError,
+                onChanged: _updateMobileError,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              const SizedBox(height: 16),
+
+              // Email Field
+              _buildTextField(
+                label: 'Email',
+                controller: _emailController,
+                icon: Icons.email,
+                keyboardType: TextInputType.emailAddress,
+                errorText: _emailError,
+                onChanged: _onEmailChanged,
+              ),
+              const SizedBox(height: 16),
+
+              // Address Field
+              _buildTextField(
+                label: 'Address',
+                controller: _addressController,
+                icon: Icons.location_on,
+                isMultiLine: true,
+                errorText: _addressError,
+                onChanged: _updateAddressError,
+              ),
+              const SizedBox(height: 32),
+
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submitCustomer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromRGBO(0, 140, 192, 1),
+                    padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            'Create Customer',
-                            style: GoogleFonts.inter(
-                              fontSize: isMobile ? 16 : 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
                             ),
                           ),
-                  ),
+                        )
+                      : Text(
+                          'Create Customer',
+                          style: GoogleFonts.inter(
+                            fontSize: isMobile ? 16 : 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller,
-    IconData icon,
-    bool isRequired, {
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    TextInputType? keyboardType,
     bool isMultiLine = false,
+    String? errorText,
+    void Function(String)? onChanged,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,46 +305,64 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
                 color: Colors.black87,
               ),
             ),
-            if (isRequired) ...[
-              const SizedBox(width: 4),
-              Text(
-                '*',
-                style: GoogleFonts.inter(color: Colors.red, fontSize: 14),
-              ),
-            ],
+            const SizedBox(width: 4),
+            Text(
+              '*',
+              style: GoogleFonts.inter(color: Colors.red, fontSize: 14),
+            ),
           ],
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          keyboardType:
+              keyboardType ??
+              (isMultiLine ? TextInputType.multiline : TextInputType.text),
           maxLines: isMultiLine ? 3 : 1,
-          keyboardType: isMultiLine ? TextInputType.multiline : TextInputType.text,
+          onChanged: onChanged,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : const Color(0xFFE0E0E0),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color.fromRGBO(0, 140, 192, 1)),
+              borderSide: BorderSide(
+                color: errorText != null
+                    ? Colors.red
+                    : const Color.fromRGBO(0, 140, 192, 1),
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            errorText: null, // We show error below manually
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
             fillColor: Colors.grey.shade50,
             filled: true,
           ),
-          validator: (value) {
-            if (isRequired && (value == null || value.isEmpty)) {
-              return 'Please enter $label';
-            }
-            if (label == 'Email' && value != null && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-              return 'Please enter a valid email';
-            }
-            if (label == 'Mobile' && value != null && !RegExp(r'^\d{10}$').hasMatch(value)) {
-              return 'Please enter a valid 10-digit mobile number';
-            }
-            return null;
-          },
         ),
+        // Dynamic Error Message with Animation
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: AnimatedOpacity(
+              opacity: errorText.isNotEmpty ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                errorText,
+                style: GoogleFonts.inter(
+                  color: Colors.red,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        if (errorText != null) const SizedBox(height: 8),
       ],
     );
   }

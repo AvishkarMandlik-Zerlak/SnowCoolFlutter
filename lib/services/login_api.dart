@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/api_config.dart';
+import '../utils/token_manager.dart'; // ← ADD THIS IMPORT
 
 /// Structured response from the login API.
 class LoginResponse {
@@ -12,7 +13,31 @@ class LoginResponse {
   final int? id;
   final String? role;
 
-  LoginResponse({required this.success, this.message, this.field, this.token,  this.id, this.role,});
+  // ──────────────────────────────────────────────────────────────
+  // NEW PERMISSION FLAGS (added)
+  // ──────────────────────────────────────────────────────────────
+  final bool? canCreateCustomers;
+  final bool? canManageChallans;
+  final bool? canManageGoodsItems;
+  final bool? canManageProfiles;
+  final bool? canManageSettings;
+  final bool? canManagePassbook; // NEW
+
+  LoginResponse({
+    required this.success,
+    this.message,
+    this.field,
+    this.token,
+    this.id,
+    this.role,
+    // NEW
+    this.canCreateCustomers,
+    this.canManageChallans,
+    this.canManageGoodsItems,
+    this.canManageProfiles,
+    this.canManageSettings,
+    this.canManagePassbook,
+  });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
@@ -22,7 +47,29 @@ class LoginResponse {
       token: json['token']?.toString(),
       id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()),
       role: json['role']?.toString(),
+      // NEW: Extract permission booleans
+      canCreateCustomers: json['canCreateCustomers'] as bool?,
+      canManageChallans: json['canManageChallans'] as bool?,
+      canManageGoodsItems: json['canManageGoodsItems'] as bool?,
+      canManageProfiles: json['canManageProfiles'] as bool?,
+      canManageSettings: json['canManageSettings'] as bool?,
+      canManagePassbook: json['canManagePassbook'] as bool?, // NEW
     );
+  }
+
+  /// Helper to convert back to JSON (used for TokenManager)
+  Map<String, dynamic> toJson() {
+    return {
+      'token': token,
+      'id': id,
+      'role': role,
+      'canCreateCustomers': canCreateCustomers,
+      'canManageChallans': canManageChallans,
+      'canManageGoodsItems': canManageGoodsItems,
+      'canManageProfiles': canManageProfiles,
+      'canManageSettings': canManageSettings,
+      'canManagePassbook': canManagePassbook,
+    };
   }
 }
 
@@ -58,7 +105,18 @@ class LoginApi {
         try {
           final Map<String, dynamic> jsonResp =
               jsonDecode(resp.body) as Map<String, dynamic>;
-          return LoginResponse.fromJson(jsonResp);
+          final loginResponse = LoginResponse.fromJson(jsonResp);
+
+          // ──────────────────────────────────────────────────────
+          // NEW: Save all data to TokenManager on successful login
+          // ──────────────────────────────────────────────────────
+          final tm = TokenManager();
+          tm.setToken(loginResponse.token);
+          tm.setId(loginResponse.id);
+          tm.setRole(loginResponse.role);
+          tm.setPermissionsFromJson(jsonResp); // ← Saves all can* flags
+
+          return loginResponse;
         } catch (e) {
           print('LoginApi: failed to decode JSON: $e');
           return LoginResponse(

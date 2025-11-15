@@ -4,15 +4,16 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 // Conditional import for File (only on mobile, ignored on web)
-import 'dart:io' show File if (dart.library.io) 'dart:io';
+
+import 'package:snow_trading_cool/utils/api_config.dart';
 
 /// ---------------------------------------------------------------------------
 /// DTO – matches the JSON that the Spring controller returns
 /// ---------------------------------------------------------------------------
 class ApplicationSettingsDTO {
   final int? id;
-  final String? logoBase64;          // <-- Base64 string (sent to backend)
-  final String? signatureBase64;     // <-- Base64 string
+  final String? logoBase64; // <-- Base64 string (sent to backend)
+  final String? signatureBase64; // <-- Base64 string
   final String? invoicePrefix;
   final String? challanNumberFormat;
   final int? challanSequence;
@@ -78,12 +79,15 @@ class ApplicationSettingsDTO {
     if (logoBase64 != null) map['logo'] = logoBase64;
     if (signatureBase64 != null) map['signature'] = signatureBase64;
     if (invoicePrefix != null) map['invoicePrefix'] = invoicePrefix;
-    if (challanNumberFormat != null) map['challanNumberFormat'] = challanNumberFormat;
+    if (challanNumberFormat != null)
+      map['challanNumberFormat'] = challanNumberFormat;
     if (challanSequence != null) map['challanSequence'] = challanSequence;
     if (challanSequenceResetPolicy != null)
       map['challanSequenceResetPolicy'] = challanSequenceResetPolicy;
-    if (sequenceLastResetDate != null) map['sequenceLastResetDate'] = sequenceLastResetDate;
-    if (termsAndConditions != null) map['termsAndConditions'] = termsAndConditions;
+    if (sequenceLastResetDate != null)
+      map['sequenceLastResetDate'] = sequenceLastResetDate;
+    if (termsAndConditions != null)
+      map['termsAndConditions'] = termsAndConditions;
     return map;
   }
 }
@@ -92,7 +96,7 @@ class ApplicationSettingsDTO {
 /// API client
 /// ---------------------------------------------------------------------------
 class ApplicationSettingsApi {
-  static const String _baseUrl = "http://localhost:8081/api/v1/settings";
+  final String _baseUrl = ApiConfig.baseUrl;
 
   final String token;
 
@@ -100,14 +104,16 @@ class ApplicationSettingsApi {
 
   /// GET /getSettings
   Future<ApplicationSettingsDTO?> getSettings() async {
-    final uri = Uri.parse('$_baseUrl/getSettings');
-    final response = await http.get(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    ).timeout(const Duration(seconds: 15));
+    final uri = Uri.parse('$_baseUrl/api/v1/settings/getSettings');
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -116,7 +122,8 @@ class ApplicationSettingsApi {
       return null; // No settings yet
     } else {
       throw Exception(
-          'Failed to load settings: ${response.statusCode} ${response.body}');
+        'Failed to load settings: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
@@ -125,7 +132,9 @@ class ApplicationSettingsApi {
     String method,
     ApplicationSettingsDTO dto,
   ) async {
-    final url = method == 'POST' ? '$_baseUrl/create' : '$_baseUrl/update';
+    final url = method == 'POST'
+        ? '$_baseUrl/api/v1/settings//create'
+        : '$_baseUrl/api/v1/settings/update';
     final body = jsonEncode(dto.toJson());
 
     final request = http.Request(method, Uri.parse(url))
@@ -140,8 +149,7 @@ class ApplicationSettingsApi {
       final json = jsonDecode(resp.body) as Map<String, dynamic>;
       return ApplicationSettingsDTO.fromJson(json);
     } else {
-      throw Exception(
-          '$method failed: ${resp.statusCode} – ${resp.body}');
+      throw Exception('$method failed: ${resp.statusCode} – ${resp.body}');
     }
   }
 

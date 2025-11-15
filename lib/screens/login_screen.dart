@@ -70,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // navigation after the widget tree was disposed (which can cause the
       // "Trying to render a disposed EngineFlutterView" exception on web).
       if (!mounted) return;
+      // showSuccessToast(context, "Login Successful");
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -88,13 +89,14 @@ class _LoginScreenState extends State<LoginScreen> {
         // Store the token for future API calls
         if (resp.token != null) {
           TokenManager().setToken(resp.token);
-          TokenManager().setRole(username);
-          TokenManager().setId(resp.id as int?);
+          TokenManager().setRole(resp.role);
+          TokenManager().setId(resp.id);
           print('Token stored: ${resp.token}');
         }
 
         setState(() => _loading = false); // Success: No delay, fast navigate
         if (!mounted) return;
+        // showSuccessToast(context, "Login Successful");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),

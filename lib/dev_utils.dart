@@ -11,10 +11,11 @@ class DevUtils {
         role: 'Admin',
         active: true,
         canCreateCustomer: true,
-        canManageGoods: true,
+        canManageGoodsItems: true,
         canManageChallans: true,
         canManageProfiles: true,
         canManageSettings: true,
+        canManagePassbook: true, // ← NEW FIELD
       );
       if (response.success) {
         print('Demo admin created successfully');

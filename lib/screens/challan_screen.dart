@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:lottie/lottie.dart';
+import 'package:snow_trading_cool/screens/view_challan.dart';
 import 'package:snow_trading_cool/services/challan_api.dart';
 import 'package:snow_trading_cool/services/customer_api.dart';
 import 'package:snow_trading_cool/services/goods_api.dart';
@@ -21,16 +23,16 @@ class _ChallanScreenState extends State<ChallanScreen> {
   final GoodsApi _goodsApi = GoodsApi();
 
   final TextEditingController customerNameController = TextEditingController();
-  final TextEditingController locationController = TextEditingController();
+  final TextEditingController locationController =
+      TextEditingController(); // Now used as Customer Address
   final TextEditingController transporterController = TextEditingController();
   final TextEditingController vehicleDriverDetailsController =
       TextEditingController();
   final TextEditingController vehicleNumberController = TextEditingController();
   final TextEditingController mobileNumberController = TextEditingController();
   final TextEditingController customerEmailController = TextEditingController();
-  final TextEditingController customerAddressController =
-      TextEditingController();
   late final TextEditingController dateController;
+  final TextEditingController _emailController = TextEditingController();
 
   // ---------- Dynamic Product Controllers ----------
   List<GoodsDTO> goods = [];
@@ -41,18 +43,22 @@ class _ChallanScreenState extends State<ChallanScreen> {
   // ---------- State ----------
   bool challanTypeSelected = true;
   int? selectedCustomerId;
-  String type = "RECEIVE";
-  int? _challanId; // null = new, non-null = edit
+  String type = "RECEIVED";
+  int? _challanId;
 
-  List<CustomerDTO> searchResults = [];
-  bool showDropdown = false;
-  bool _loading = false;
-  bool _saving = false;
+  // FIXED: Using GlobalKey for perfect overlay positioning
+  final GlobalKey _customerFieldKey = GlobalKey();
+  OverlayEntry? _overlayEntry;
+  bool _isSearching = false;
 
   // Inline errors
   String? _vehicleNumberError;
   String? _driverDetailsError;
   String? _mobileNumberError;
+  String? _emailError;
+
+  bool _loading = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -61,7 +67,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
       text: DateTime.now().toIso8601String().split('T').first,
     );
 
-    // SAFELY extract challan ID from map
     _challanId = _safeParseId(widget.challanData?['id']);
 
     _loadGoods().then((_) {
@@ -71,7 +76,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
     });
   }
 
-  // SAFELY parse ID to int
   int? _safeParseId(dynamic id) {
     if (id == null) return null;
     if (id is int) return id;
@@ -96,7 +100,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
     }
   }
 
-  // Load existing challan data for edit
   Future<void> _loadChallanForEdit() async {
     if (_challanId == null) return;
     setState(() => _loading = true);
@@ -109,25 +112,32 @@ class _ChallanScreenState extends State<ChallanScreen> {
         selectedCustomerId = data['customerId'] as int?;
         customerNameController.text = data['customerName'] ?? '';
         mobileNumberController.text = data['contactNumber'] ?? '';
-        customerEmailController.text = data['customerEmail'] ?? '';
-        customerAddressController.text = data['customerAddress'] ?? '';
-        locationController.text = data['location'] ?? '';
+        customerEmailController.text =
+            (data['customerEmail'] ?? data['email'] ?? '').toLowerCase();
+        locationController.text =
+            data['customerAddress'] ?? data['siteLocation'] ?? '';
+
         transporterController.text = data['transporter'] ?? '';
         vehicleNumberController.text = data['vehicleNumber'] ?? '';
+
         vehicleDriverDetailsController.text =
             '${data['driverName'] ?? ''} - ${data['driverNumber'] ?? ''}'
                 .trim()
                 .replaceAll(RegExp(r'\s+'), ' ');
-        dateController.text = data['date'] ?? dateController.text;
-        type = data['challanType'] ?? 'RECEIVE';
-        challanTypeSelected = type == 'RECEIVE';
 
-        // Pre-fill items
+        dateController.text = data['date'] ?? dateController.text;
+        type = data['challanType'] ?? 'RECEIVED';
+        challanTypeSelected = type == 'RECEIVED';
+
+        // Clear previous values
+        for (final ctrl in _qtyControllers.values) ctrl.clear();
+        for (final ctrl in _srNoControllers.values) ctrl.clear();
+
         final List<dynamic> items = data['items'] ?? [];
         for (var item in items) {
-          final productName = item['product'] as String?;
-          final qty = item['quantity']?.toString() ?? '';
-          final srNo = item['serialNumber'] as String?;
+          final productName = item['name'] as String?;
+          final qty = item['qty']?.toString() ?? '';
+          final srNo = item['srNo'] as String?;
 
           if (productName != null && _qtyControllers.containsKey(productName)) {
             _qtyControllers[productName]!.text = qty;
@@ -135,10 +145,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
           }
         }
 
-        // Trigger validations
         _validateVehicleNumber(vehicleNumberController.text);
         _validateDriverDetails(vehicleDriverDetailsController.text);
         _validateMobileNumber(mobileNumberController.text);
+        _validateEmail(customerEmailController.text);
       });
     } catch (e) {
       showErrorToast(context, "Failed to load challan: $e");
@@ -151,33 +161,132 @@ class _ChallanScreenState extends State<ChallanScreen> {
     showErrorToast(context, message);
   }
 
-  // ---------- Customer Search ----------
-  Future<void> searchCustomer(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() {
-        showDropdown = false;
-        searchResults = [];
-      });
+  void _onCustomerSearchChanged(String query) async {
+    final trimmed = query.trim();
+    _removeOverlay();
+    if (trimmed.isEmpty) {
+      setState(() => _isSearching = false);
       return;
     }
-    if (_loading) return;
-    setState(() => _loading = true);
+
+    setState(() => _isSearching = true);
 
     try {
-      final results = await _customerApi.searchCustomers(query.trim());
-      setState(() {
-        searchResults = results;
-        showDropdown = results.isNotEmpty;
-        _loading = false;
-      });
+      List<CustomerDTO> results = [];
+
+      if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+        results = await _customerApi.searchCustomers(contactNumber: trimmed);
+      } else if (trimmed.contains('@')) {
+        results = await _customerApi.searchCustomers(email: trimmed);
+      } else {
+        results = await _customerApi.searchCustomers(name: trimmed);
+      }
+
+      if (!mounted) return;
+      _showOverlay(results);
     } catch (e) {
-      setState(() {
-        searchResults = [];
-        showDropdown = false;
-        _loading = false;
-      });
-      _showError('Search error: $e');
+      _showError('Search failed: $e');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
     }
+  }
+
+  void _showOverlay(List<CustomerDTO> results) {
+    _removeOverlay();
+
+    final RenderBox? renderBox =
+        _customerFieldKey.currentContext?.findRenderObject() as RenderBox?;
+    final double width =
+        renderBox?.size.width ?? MediaQuery.of(context).size.width * 0.9;
+    final Offset offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final double top = offset.dy + (renderBox?.size.height ?? 55);
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _removeOverlay,
+              child: Container(color: Colors.transparent),
+            ),
+          ),
+          Positioned(
+            left: offset.dx,
+            top: top,
+            width: width,
+            child: Material(
+              elevation: 12,
+              borderRadius: BorderRadius.circular(12),
+              shadowColor: Colors.black26,
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 320),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300, width: 1),
+                ),
+                child: results.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          "No customers found",
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shrinkWrap: true,
+                        itemCount: results.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, thickness: 0.5),
+                        itemBuilder: (context, i) {
+                          final c = results[i];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            title: Text(
+                              c.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: Text(
+                              c.contactNumber,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.person_outline,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                            onTap: () {
+                              selectCustomer(c);
+                              _removeOverlay();
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 
   void selectCustomer(CustomerDTO customer) {
@@ -185,14 +294,14 @@ class _ChallanScreenState extends State<ChallanScreen> {
       selectedCustomerId = customer.id;
       customerNameController.text = customer.name;
       mobileNumberController.text = customer.contactNumber;
-      customerEmailController.text = customer.email ?? '';
-      customerAddressController.text = customer.address ?? '';
-      showDropdown = false;
+      customerEmailController.text = (customer.email ?? '').toLowerCase();
+      locationController.text = customer.address ?? '';
       _validateMobileNumber(customer.contactNumber);
+      _validateEmail(customerEmailController.text);
     });
+    _removeOverlay();
   }
 
-  // ---------- Validators ----------
   void _validateVehicleNumber(String value) {
     final cleaned = value.trim().toUpperCase();
     final p1 = RegExp(r'^[A-Z]{2}\d{1,2}[A-Z]{1,2}\d{4}$');
@@ -232,7 +341,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
         return;
       }
       final name = parts[0];
-      final numberPart = parts.sublist(1).join('').replaceAll(RegExp(r'[^0-9]'), '');
+      final numberPart = parts
+          .sublist(1)
+          .join('')
+          .replaceAll(RegExp(r'[^0-9]'), '');
 
       if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(name)) {
         _driverDetailsError = 'Driver name: letters & spaces only';
@@ -272,25 +384,40 @@ class _ChallanScreenState extends State<ChallanScreen> {
           );
         }
       } else {
-        _mobileNumberError = 'Mobile number must be 10 digits and start with 5–9';
+        _mobileNumberError =
+            'Mobile number must be 10 digits and start with 5–9';
       }
     });
   }
 
-  // ---------- SAVE / UPDATE CHALLAN ----------
+  void _validateEmail(String value) {
+    final trimmed = value.trim();
+    setState(() {
+      if (trimmed.isEmpty) {
+        _emailError = null;
+      } else if (trimmed != trimmed.toLowerCase()) {
+        _emailError = 'Email must be in lowercase';
+      } else if (RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(trimmed)) {
+        _emailError = null;
+      } else {
+        _emailError = 'Enter a valid email address';
+      }
+    });
+  }
+
   Future<void> _saveChallanData() async {
     if (_saving) return;
     setState(() => _saving = true);
 
     final customerName = customerNameController.text.trim();
-    final location = locationController.text.trim();
+    final customerAddress = locationController.text.trim();
     final transporter = transporterController.text.trim();
     final vehicleNumber = vehicleNumberController.text.trim().toUpperCase();
     final driverDetails = vehicleDriverDetailsController.text.trim();
     final mobileNumber = mobileNumberController.text.trim();
     final challanDate = dateController.text;
+    final customerEmail = customerEmailController.text.trim().toLowerCase();
 
-    // Extract driver name & number
     if (!driverDetails.contains('-')) {
       _showError('Driver: Name - 9876543210');
       setState(() => _saving = false);
@@ -303,7 +430,10 @@ class _ChallanScreenState extends State<ChallanScreen> {
       return;
     }
     final driverName = dParts[0];
-    final driverNumber = dParts.sublist(1).join('').replaceAll(RegExp(r'[^0-9]'), '');
+    final driverNumber = dParts
+        .sublist(1)
+        .join('')
+        .replaceAll(RegExp(r'[^0-9]'), '');
 
     if (!RegExp(r'^[A-Za-z\s]+$').hasMatch(driverName)) {
       _showError('Driver name: letters only');
@@ -321,7 +451,6 @@ class _ChallanScreenState extends State<ChallanScreen> {
       return;
     }
 
-    // Basic validation
     if (customerName.isEmpty) {
       _showError('Enter customer name');
       setState(() => _saving = false);
@@ -354,16 +483,12 @@ class _ChallanScreenState extends State<ChallanScreen> {
       setState(() => _saving = false);
       return;
     }
-    if (location.isEmpty) {
-      _showError('Enter location');
+    if (customerAddress.isEmpty) {
+      _showError('Enter customer address (Location)');
       setState(() => _saving = false);
       return;
     }
-    if (selectedCustomerId == null) {
-      _showError('Select a customer');
-      setState(() => _saving = false);
-      return;
-    }
+
     final mobileDigits = mobileNumber.replaceAll(RegExp(r'[^0-9]'), '');
     if (mobileDigits.length != 10) {
       _showError('Mobile number must be 10 digits');
@@ -375,8 +500,18 @@ class _ChallanScreenState extends State<ChallanScreen> {
       setState(() => _saving = false);
       return;
     }
+    if (customerEmail.isNotEmpty &&
+        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(customerEmail)) {
+      _showError('Enter a valid email address');
+      setState(() => _saving = false);
+      return;
+    }
+    if (customerEmail.isNotEmpty && customerEmail != customerEmail.toLowerCase()) {
+      _showError('Email must be in lowercase');
+      setState(() => _saving = false);
+      return;
+    }
 
-    // ---------- Dynamic Product Validation ----------
     final List<Map<String, dynamic>> items = [];
     for (final g in goods) {
       final qtyText = _qtyControllers[g.name]!.text.trim();
@@ -396,7 +531,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
         return;
       }
 
-      items.add({'product': g.name, 'quantity': qty, 'serialNumber': srText});
+      items.add({'name': g.name, 'qty': qty, 'srNo': srText});
     }
 
     if (items.isEmpty) {
@@ -410,12 +545,11 @@ class _ChallanScreenState extends State<ChallanScreen> {
       bool success;
 
       if (_challanId == null) {
-        // CREATE
         success = await _api.createChallan(
-          customerId: selectedCustomerId!,
+          customerId: selectedCustomerId,
           customerName: customerName,
           challanType: type,
-          location: location,
+          location: customerAddress,
           transporter: transporter,
           vehicleNumber: vehicleNumber,
           driverName: driverName,
@@ -423,21 +557,27 @@ class _ChallanScreenState extends State<ChallanScreen> {
           contactNumber: mobileDigits,
           items: items,
           date: challanDate,
+          email: customerEmail,
+          address: customerAddress,
         );
         if (success) {
           showSuccessToast(context, "Challan saved successfully");
-          _clearAllFields();
+          if (!mounted) return;
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const ViewChallanScreen()),
+            (route) => false,
+          );
         } else {
           _showError('Failed to save challan');
         }
       } else {
-        // UPDATE
         success = await _api.updateChallan(
           challanId: _challanId!,
-          customerId: selectedCustomerId!,
+          customerId: selectedCustomerId,
           customerName: customerName,
           challanType: type,
-          location: location,
+          location: customerAddress,
           transporter: transporter,
           vehicleNumber: vehicleNumber,
           driverName: driverName,
@@ -445,6 +585,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
           contactNumber: mobileDigits,
           items: items,
           date: challanDate,
+          email: customerEmail,
+          address: customerAddress,
         );
         if (success) {
           showSuccessToast(context, "Challan updated successfully");
@@ -476,7 +618,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
       vehicleNumberController.clear();
       mobileNumberController.clear();
       customerEmailController.clear();
-      customerAddressController.clear();
+      _emailController.clear();
 
       for (final ctrl in _qtyControllers.values) ctrl.clear();
       for (final ctrl in _srNoControllers.values) ctrl.clear();
@@ -485,13 +627,16 @@ class _ChallanScreenState extends State<ChallanScreen> {
       _vehicleNumberError = null;
       _driverDetailsError = null;
       _mobileNumberError = null;
-      type = "RECEIVE";
+      _emailError = null;
+      type = "RECEIVED";
       challanTypeSelected = true;
     });
+    _removeOverlay();
   }
 
   @override
   void dispose() {
+    _removeOverlay();
     customerNameController.dispose();
     locationController.dispose();
     transporterController.dispose();
@@ -499,8 +644,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
     vehicleNumberController.dispose();
     mobileNumberController.dispose();
     customerEmailController.dispose();
-    customerAddressController.dispose();
     dateController.dispose();
+    _emailController.dispose();
     for (final ctrl in _qtyControllers.values) ctrl.dispose();
     for (final ctrl in _srNoControllers.values) ctrl.dispose();
     super.dispose();
@@ -526,152 +671,185 @@ class _ChallanScreenState extends State<ChallanScreen> {
           color: Color.fromRGBO(0, 140, 192, 1),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: padding,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildLabeledField(
-                            label: "Customer Name",
-                            controller: customerNameController,
-                            hint: "Enter Customer Name",
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp(r'[A-Za-z\s]'),
-                              ),
-                            ],
-                            onChanged: searchCustomer,
-                            enabled: true,
-                          ),
-                          if (showDropdown)
-                            Container(
-                              margin: const EdgeInsets.only(top: 4),
-                              constraints: BoxConstraints(
-                                maxHeight: size.height * 0.25,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade400),
-                                borderRadius: BorderRadius.circular(8),
-                                color: Colors.white,
-                              ),
-                              child: _loading
-                                  ? const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    )
-                                  : ListView.builder(
-                                      shrinkWrap: true,
-                                      itemCount: searchResults.length,
-                                      itemBuilder: (context, i) {
-                                        final c = searchResults[i];
-                                        return ListTile(
-                                          dense: true,
-                                          title: Text(
-                                            c.name,
-                                            style: const TextStyle(fontSize: 14),
-                                          ),
-                                          subtitle: Text(
-                                            c.contactNumber,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                          onTap: () => selectCustomer(c),
-                                        );
-                                      },
-                                    ),
+      body: GestureDetector(
+        onTap: () {
+          _removeOverlay();
+          FocusScope.of(context).unfocus();
+        },
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: padding,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildCustomerSearchField(),
+                            const SizedBox(height: 12),
+                            _buildChallanTypeRow(),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Date",
+                              controller: dateController,
+                              hint: "Auto-filled (yyyy-MM-dd)",
+                              enabled: true,
+                              prefixIcon: const Icon(Icons.calendar_month),
+                              onTap: () async {
+                                final DateTime? pickedDate =
+                                    await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                if (pickedDate != null) {
+                                  dateController.text =
+                                      "${pickedDate.toLocal()}".split(' ')[0];
+                                }
+                              },
                             ),
-
-                          const SizedBox(height: 12),
-                          _buildChallanTypeRow(),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Location",
-                            controller: locationController,
-                            hint: "Enter Location",
-                            enabled: true,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Vehicle Number",
-                            controller: vehicleNumberController,
-                            hint: "e.g., MH12AB1234 or 22BH1234AA",
-                            onChanged: _validateVehicleNumber,
-                            errorText: _vehicleNumberError,
-                            enabled: true,
-                            inputFormatters: [UpperCaseTextFormatter()],
-                          ),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Transporter",
-                            controller: transporterController,
-                            hint: "Enter Transporter Details",
-                            enabled: true,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Driver Details",
-                            controller: vehicleDriverDetailsController,
-                            hint: "e.g., Name - 9876543210",
-                            onChanged: _validateDriverDetails,
-                            errorText: _driverDetailsError,
-                            enabled: true,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Mobile Number",
-                            controller: mobileNumberController,
-                            hint: "e.g., 9876543210 (starts with 5–9)",
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(10),
-                            ],
-                            onChanged: _validateMobileNumber,
-                            errorText: _mobileNumberError,
-                            enabled: true,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildLabeledField(
-                            label: "Date",
-                            controller: dateController,
-                            hint: "Auto-filled (yyyy-MM-dd)",
-                            enabled: true,
-                            prefixIcon: Icon(Icons.calendar_month),
-                            onTap: () async {
-                              final DateTime? pickedDate = await showDatePicker(
-                                context: context,
-                                initialDate: DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-
-                              if (pickedDate != null) {
-                                dateController.text = "${pickedDate.toLocal()}".split(' ')[0];
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          _buildProductTable(),
-                        ],
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Customer Address",
+                              controller: locationController,
+                              hint: "Enter customer address (Location)",
+                              enabled: true,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Vehicle Number",
+                              controller: vehicleNumberController,
+                              hint: "e.g., MH12AB1234 or 22BH1234AA",
+                              onChanged: _validateVehicleNumber,
+                              errorText: _vehicleNumberError,
+                              enabled: true,
+                              inputFormatters: [UpperCaseTextFormatter()],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Transporter",
+                              controller: transporterController,
+                              hint: "Enter Transporter Details",
+                              enabled: true,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Driver Details",
+                              controller: vehicleDriverDetailsController,
+                              hint: "e.g., Name - 9876543210",
+                              onChanged: _validateDriverDetails,
+                              errorText: _driverDetailsError,
+                              enabled: true,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "Mobile Number",
+                              controller: mobileNumberController,
+                              hint: "e.g., 9876543210 (starts with 5–9)",
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              onChanged: _validateMobileNumber,
+                              errorText: _mobileNumberError,
+                              enabled: true,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildLabeledField(
+                              label: "E-Mail",
+                              controller: customerEmailController,
+                              hint: "e.g., example@domain.com (lowercase only)",
+                              enabled: true,
+                              keyboardType: TextInputType.emailAddress,
+                              onChanged: (value) {
+                                final lower = value.toLowerCase();
+                                if (value != lower) {
+                                  customerEmailController.text = lower;
+                                  customerEmailController.selection =
+                                      TextSelection.fromPosition(
+                                    TextPosition(offset: lower.length),
+                                  );
+                                }
+                                _validateEmail(lower);
+                              },
+                              errorText: _emailError,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildProductTable(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  _buildActionButtons(isEditMode),
-                ],
+                    _buildActionButtons(isEditMode),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
-  // Rest of your methods: _buildLabeledField, _buildChallanTypeRow, etc.
-  // (Unchanged — already perfect)
+  Widget _buildCustomerSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Customer Name or Mobile",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color.fromRGBO(20, 20, 20, 1),
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          key: _customerFieldKey,
+          controller: customerNameController,
+          onChanged: _onCustomerSearchChanged,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\s]')),
+          ],
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 14,
+            ),
+            hintText: "Search by name or mobile...",
+            hintStyle: const TextStyle(
+              fontSize: 15,
+              color: Color.fromRGBO(156, 156, 156, 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderSide: const BorderSide(
+                color: Color.fromRGBO(156, 156, 156, 1),
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderSide: BorderSide(
+                color: Color.fromRGBO(0, 140, 192, 1),
+                width: 2,
+              ),
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+            suffixIcon: _isSearching
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.grey,
+                    ),
+                  )
+                :const Icon(Icons.search, color: Colors.grey),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildLabeledField({
     required String label,
@@ -753,9 +931,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
           ),
         ),
         const SizedBox(width: 16),
-        _typeBtn("Received", true, "RECEIVE"),
+        _typeBtn("Received", true, "RECEIVED"),
         const SizedBox(width: 16),
-        _typeBtn("Delivery", false, "DELIVER"),
+        _typeBtn("Delivered", false, "DELIVERED"),
       ],
     );
   }
@@ -821,8 +999,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
       ),
       child: Table(
         columnWidths: const {
-          0: FlexColumnWidth(2.5),
-          1: FlexColumnWidth(1.5),
+          0: FlexColumnWidth(1.5),
+          1: FlexColumnWidth(0.8),
           2: FlexColumnWidth(1.5),
         },
         children: [
@@ -834,7 +1012,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                 topRight: Radius.circular(8),
               ),
             ),
-            children: ["Product", "QTY (≥1)", "Sr. No"]
+            children: ["Product", "QTY", "Sr. No"]
                 .map(
                   (e) => Padding(
                     padding: const EdgeInsets.all(10),
@@ -870,7 +1048,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
           ),
         ),
         _numField(qtyCtrl),
-        _numField(srCtrl),
+        _srNoField(srCtrl), // ← Now accepts String
       ],
     );
   }
@@ -882,6 +1060,35 @@ class _ChallanScreenState extends State<ChallanScreen> {
         controller: ctrl,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: const InputDecoration(
+          contentPadding: EdgeInsets.all(8),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(
+              color: Color.fromRGBO(238, 238, 238, 1),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.all(Radius.circular(4)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(
+              color: Color.fromRGBO(238, 238, 238, 1),
+              width: 2.0,
+            ),
+            borderRadius: BorderRadius.all(Radius.circular(4)),
+          ),
+        ),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _srNoField(TextEditingController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: TextInputType.text,
+        inputFormatters: [], // ← Allows letters + numbers
         decoration: const InputDecoration(
           contentPadding: EdgeInsets.all(8),
           enabledBorder: OutlineInputBorder(

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../utils/api_config.dart';
 import '../utils/api_utils.dart';
 
-/// Customer DTO – used by CustomerApi and ChallanScreen
+/// Customer DTO – MATCHES com.snowCool.dto.CustomerDTO
 class CustomerDTO {
   final int id;
   final String name;
@@ -20,54 +20,143 @@ class CustomerDTO {
   });
 
   factory CustomerDTO.fromJson(Map<String, dynamic> json) {
-    int parseId(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
     return CustomerDTO(
-      id: parseId(json['id']),
-      name: json['name']?.toString() ?? '',
-      address: json['address']?.toString(),
-      contactNumber: json['contactNumber']?.toString() ?? '',
-      email: json['email']?.toString(),
+      id: _parseInt(json['id']),
+      name: json['name']?.toString().trim() ?? '',
+      address: json['address']?.toString().trim(),
+      contactNumber: json['contactNumber']?.toString().trim() ?? '',
+      email: json['email']?.toString().trim(),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'address': address,
-      'contactNumber': contactNumber,
-      'email': email,
-    };
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'address': address,
+    'contactNumber': contactNumber,
+    'email': email,
+  };
+}
+
+/// Paginated response model for Customer page API
+class CustomerPageResponse {
+  final List<CustomerDTO> content;
+  final int totalPages;
+  final int totalElements;
+  final int size;
+  final int number;
+
+  CustomerPageResponse({
+    required this.content,
+    required this.totalPages,
+    required this.totalElements,
+    required this.size,
+    required this.number,
+  });
+
+  factory CustomerPageResponse.fromJson(Map<String, dynamic> json) {
+    final contentList =
+        (json['content'] as List<dynamic>?)
+            ?.map((e) => CustomerDTO.fromJson(e))
+            .toList() ??
+        [];
+    return CustomerPageResponse(
+      content: contentList,
+      totalPages: json['totalPages'] ?? 1,
+      totalElements: json['totalElements'] ?? contentList.length,
+      size: json['size'] ?? 10,
+      number: json['number'] ?? 0,
+    );
   }
 }
 
+/// UPDATED CustomerApi with pagination and existing CRUD methods
 class CustomerApi {
   final String baseUrl;
 
-  CustomerApi({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
+  CustomerApi({String? baseUrl})
+    : baseUrl =
+          (baseUrl ??
+                  (ApiConfig.baseUrl is Function
+                      ? (ApiConfig.baseUrl as Function)()
+                      : ApiConfig.baseUrl))
+              .toString();
 
-  Future<List<CustomerDTO>> searchCustomers(String? nameQuery) async {
-    if (nameQuery?.isEmpty ?? true) {
-      return [];
-    }
-
-    final normalizedBase = baseUrl.endsWith('/')
+  String _normalizeBaseUrl() {
+    return baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
+  }
 
-    final queryParams = <String, String>{
-      if (nameQuery != null) 'name': nameQuery,
-    };
+  // ---------------------------------------------------------------------------
+  // PAGINATED FETCH METHOD
+  // ---------------------------------------------------------------------------
+  Future<CustomerPageResponse> getCustomersPage({
+    int page = 0,
+    int size = 10,
+  }) async {
+    final normalizedBase = _normalizeBaseUrl();
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/customers/page',
+    ).replace(queryParameters: {'page': '$page', 'size': '$size'});
 
-    final url = Uri.parse('$normalizedBase/api/v1/customers/search')
-        .replace(queryParameters: queryParams);
+    final headers = ApiUtils.getAuthenticatedHeaders();
+    try {
+      final resp = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
 
+      if (resp.statusCode == 200) {
+        final jsonBody = jsonDecode(resp.body);
+        return CustomerPageResponse.fromJson(jsonBody);
+      } else if (resp.statusCode == 403) {
+        throw Exception('Access denied: Admin only');
+      } else if (resp.statusCode == 401) {
+        throw Exception('Unauthorized - Login again');
+      } else {
+        throw Exception('Failed to fetch customers page: ${resp.statusCode}');
+      }
+    } catch (e) {
+      print('getCustomersPage error: $e');
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SEARCH BY NAME, MOBILE, OR EMAIL
+  // ---------------------------------------------------------------------------
+  Future<List<CustomerDTO>> searchCustomers({
+    String? name,
+    String? contactNumber,
+    String? email,
+  }) async {
+    final Map<String, String> params = {};
+    if (name != null && name.trim().isNotEmpty) {
+      params['name'] = name.trim();
+    }
+    if (contactNumber != null && contactNumber.trim().isNotEmpty) {
+      final digits = contactNumber.replaceAll(RegExp(r'\D'), '');
+      if (digits.length >= 2) {
+        params['contactNumber'] = digits;
+      }
+    }
+    if (email != null && email.trim().isNotEmpty) {
+      params['email'] = email.trim();
+    }
+
+    if (params.isEmpty) return [];
+
+    final normalizedBase = _normalizeBaseUrl();
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/customers/search',
+    ).replace(queryParameters: params);
     final headers = ApiUtils.getAuthenticatedHeaders();
 
     try {
@@ -76,112 +165,102 @@ class CustomerApi {
           .timeout(const Duration(seconds: 10));
 
       if (resp.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(resp.body) as List<dynamic>;
-        return jsonList
-            .map((json) => CustomerDTO.fromJson(json))
-            .toList();
+        final List<dynamic> jsonList = jsonDecode(resp.body);
+        return jsonList.map((json) => CustomerDTO.fromJson(json)).toList();
+      } else if (resp.statusCode == 403) {
+        throw Exception('Access denied: Admin only');
       } else if (resp.statusCode == 401) {
-        throw Exception('Unauthorized - Please log in again');
+        throw Exception('Unauthorized - Login again');
       } else {
-        throw Exception('Failed to search customers');
+        print('Search failed: ${resp.statusCode} ${resp.body}');
+        return [];
       }
     } catch (e) {
-      throw Exception('Error searching customers: $e');
+      print('Search error: $e');
+      throw Exception('Search failed: $e');
     }
   }
 
-
-  // New: Get all customers (GET /api/v1/customers)
+  // ---------------------------------------------------------------------------
+  // NON-PAGINATED GET ALL (Still usable)
+  // ---------------------------------------------------------------------------
   Future<List<CustomerDTO>> getAllCustomers() async {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/customers');
-
+    final url = Uri.parse(
+      '${_normalizeBaseUrl()}/api/v1/customers/getAllCustomers',
+    );
     final headers = ApiUtils.getAuthenticatedHeaders();
-
-    try {
-      final resp = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 10));
-
-      if (resp.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(resp.body) as List<dynamic>;
-        return jsonList
-            .map((json) => CustomerDTO.fromJson(json))
-            .toList();
-      } else if (resp.statusCode == 401) {
-        throw Exception('Unauthorized - Please log in again');
-      } else {
-        throw Exception('Failed to fetch all customers');
-      }
-    } catch (e) {
-      throw Exception('Error fetching all customers: $e');
+    final resp = await http
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 200) {
+      final List<dynamic> jsonList = jsonDecode(resp.body);
+      return jsonList.map((json) => CustomerDTO.fromJson(json)).toList();
     }
+    throw Exception('Failed to load customers');
   }
 
-  // New method for creating customer
+  // ---------------------------------------------------------------------------
+  // CRUD OPERATIONS
+  // ---------------------------------------------------------------------------
+
   Future<CustomerResponse> createCustomer({
     required String name,
     required String mobile,
     required String email,
     required String address,
   }) async {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/customers');
+    final url = Uri.parse('${_normalizeBaseUrl()}/api/v1/customers/save');
     final body = jsonEncode({
-      'name': name,
-      'contactNumber': mobile,
-      'email': email,
-      'address': address,
+      'name': name.trim(),
+      'contactNumber': mobile.trim(),
+      'email': email.trim(),
+      'address': address.trim(),
     });
-
     final headers = ApiUtils.getAuthenticatedHeaders();
+    final resp = await http
+        .post(url, headers: headers, body: body)
+        .timeout(const Duration(seconds: 10));
 
-    try {
-      final resp = await http
-          .post(url, headers: headers, body: body)
-          .timeout(const Duration(seconds: 10));
-
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        final Map<String, dynamic> jsonResp = jsonDecode(resp.body);
-        return CustomerResponse.fromJson(jsonResp);
-      } else {
-        throw Exception('Failed to create customer');
+    // Treat 200/201 as success even if backend doesn't send { success: true }
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      try {
+        final dynamic decoded = resp.body.isEmpty ? {} : jsonDecode(resp.body);
+        if (decoded is Map<String, dynamic>) {
+          // If API already returns a wrapper, honor it
+          if (decoded.containsKey('success') || decoded.containsKey('data')) {
+            return CustomerResponse.fromJson(decoded);
+          }
+          // If API returns the created entity directly, mark success=true
+          final dto = CustomerDTO.fromJson(decoded);
+          final msg = decoded['message']?.toString();
+          return CustomerResponse(success: true, message: msg, data: dto);
+        } else {
+          // Non-map payload (e.g., plain string) but HTTP success
+          return CustomerResponse(
+            success: true,
+            message: decoded?.toString() ?? 'Created',
+            data: null,
+          );
+        }
+      } catch (_) {
+        // JSON parse failed but HTTP status indicates success
+        return CustomerResponse(success: true, message: 'Created', data: null);
       }
-    } catch (e) {
-      throw Exception('Error creating customer: $e');
     }
+    throw Exception('Failed to create customer');
   }
 
-  // New method for getting customer by ID
-  Future<CustomerResponse> getCustomerById(String customerId) async {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/customers/$customerId');
-
+  Future<CustomerResponse> getCustomerById(String id) async {
+    final url = Uri.parse('${_normalizeBaseUrl()}/api/v1/customers/$id');
     final headers = ApiUtils.getAuthenticatedHeaders();
-
-    try {
-      final resp = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 10));
-
-      if (resp.statusCode == 200) {
-        final Map<String, dynamic> jsonResp = jsonDecode(resp.body);
-        return CustomerResponse.fromJson(jsonResp);
-      } else {
-        throw Exception('Customer not found');
-      }
-    } catch (e) {
-      throw Exception('Error fetching customer: $e');
-    }
+    final resp = await http
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 200)
+      return CustomerResponse.fromJson(jsonDecode(resp.body));
+    throw Exception('Customer not found');
   }
 
-  // New: Update customer (PUT /api/v1/customers/{id})
   Future<CustomerResponse> updateCustomer(
     int id,
     String name,
@@ -189,66 +268,38 @@ class CustomerApi {
     String email,
     String address,
   ) async {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/customers/$id');
+    final url = Uri.parse('${_normalizeBaseUrl()}/api/v1/customers/update/$id');
     final body = jsonEncode({
-      'name': name,
-      'contactNumber': mobile,
-      'email': email,
-      'address': address,
+      'name': name.trim(),
+      'contactNumber': mobile.trim(),
+      'email': email.trim(),
+      'address': address.trim(),
     });
-
     final headers = ApiUtils.getAuthenticatedHeaders();
-
-    try {
-      final resp = await http
-          .put(url, headers: headers, body: body)
-          .timeout(const Duration(seconds: 10));
-
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        final Map<String, dynamic> jsonResp = resp.body.isNotEmpty
-            ? jsonDecode(resp.body)
-            : {'success': true, 'message': 'Customer updated successfully'};
-        return CustomerResponse.fromJson(jsonResp);
-      } else {
-        throw Exception('Failed to update customer');
-      }
-    } catch (e) {
-      throw Exception('Error updating customer: $e');
+    final resp = await http
+        .put(url, headers: headers, body: body)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 200 || resp.statusCode == 204) {
+      return CustomerResponse(success: true, message: 'Updated');
     }
+    throw Exception('Update failed');
   }
 
-  // New: Delete customer (DELETE /api/v1/customers/{id})
   Future<CustomerResponse> deleteCustomer(int id) async {
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/customers/$id');
-
+    final url = Uri.parse(
+      '${_normalizeBaseUrl()}/api/v1/customers/deleteById/$id',
+    );
     final headers = ApiUtils.getAuthenticatedHeaders();
-
-    try {
-      final resp = await http
-          .delete(url, headers: headers)
-          .timeout(const Duration(seconds: 10));
-
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        return CustomerResponse(
-          success: true,
-          message: 'Customer deleted successfully',
-        );
-      } else {
-        throw Exception('Failed to delete customer');
-      }
-    } catch (e) {
-      throw Exception('Error deleting customer: $e');
+    final resp = await http
+        .delete(url, headers: headers)
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode == 200 || resp.statusCode == 204) {
+      return CustomerResponse(success: true, message: 'Deleted');
     }
+    throw Exception('Delete failed');
   }
 }
 
-/// Response for customer operations
 class CustomerResponse {
   final bool success;
   final String? message;

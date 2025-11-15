@@ -9,11 +9,17 @@ import '../utils/api_utils.dart';
 class ProfileResponse {
   final bool success;
   final String? message; // human readable message
-  final Map<String, dynamic>? data; // profile data {name, email, phone, address, company, photoUrl?}
+  final Map<String, dynamic>?
+  data; // profile data {name, email, phone, address, company, photoUrl?}
 
   ProfileResponse({required this.success, this.message, this.data});
 
   factory ProfileResponse.fromJson(Map<String, dynamic> json) {
+    // If backend returns the profile object directly (no 'data' wrapper)
+    if (!json.containsKey('data')) {
+      return ProfileResponse(success: true, message: null, data: json);
+    }
+    // Standard wrapped response
     return ProfileResponse(
       success: json['success'] == true || json['data'] != null,
       message: json['message']?.toString(),
@@ -24,6 +30,92 @@ class ProfileResponse {
 
 /// Simple profile API wrapper.
 class ProfileApi {
+  /// Global id variable
+  static int id = 1;
+
+  /// Compute only the changed fields between [oldData] and [newData].
+  /// - Trims strings before comparison
+  /// - Excludes null/empty-string values
+  Map<String, dynamic> _diffProfileData(
+    Map<String, dynamic> oldData,
+    Map<String, dynamic> newData,
+  ) {
+    final Map<String, dynamic> diff = {};
+    for (final entry in newData.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (value == null) continue;
+      final valStr = value is String ? value.trim() : value;
+      if (valStr is String && valStr.isEmpty) continue;
+
+      final oldVal = oldData[key];
+      final oldStr = oldVal is String ? oldVal.trim() : oldVal;
+      if (oldStr != valStr) {
+        diff[key] = value;
+      }
+    }
+    return diff;
+  }
+
+  Future<ProfileResponse> updateProfile(
+    int id,
+    Map<String, dynamic> changedFields, {
+    Map<String, dynamic>? oldProfile,
+  }) async {
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final url = Uri.parse('$normalizedBase/api/v1/profiles/updateById/$id');
+    final headers = ApiUtils.getAuthenticatedHeaders();
+    // Send only changed fields when oldProfile is provided; otherwise send
+    // only non-null, non-empty fields from changedFields.
+    Map<String, dynamic> bodyData;
+    if (oldProfile != null) {
+      bodyData = _diffProfileData(oldProfile, changedFields);
+    } else {
+      bodyData = {
+        for (final e in changedFields.entries)
+          if (e.value != null &&
+              (!(e.value is String) || (e.value as String).trim().isNotEmpty))
+            e.key: e.value,
+      };
+    }
+
+    if (bodyData.isEmpty) {
+      // Nothing changed — treat as success no-op
+      return ProfileResponse(success: true, message: 'No changes to update');
+    }
+    final body = jsonEncode(bodyData);
+    log('ProfileApi update: PUT $url');
+    log('ProfileApi update: body=$body');
+    try {
+      final resp = await http
+          .put(url, headers: headers, body: body)
+          .timeout(const Duration(seconds: 10));
+      log('ProfileApi update: status=${resp.statusCode}');
+      log('ProfileApi update: response=${resp.body}');
+      if (resp.statusCode == 200) {
+        final Map<String, dynamic> jsonResp = jsonDecode(resp.body);
+        return ProfileResponse.fromJson(jsonResp);
+      } else if (resp.statusCode == 401) {
+        return ProfileResponse(
+          success: false,
+          message: 'Unauthorized. Please log in again.',
+        );
+      } else {
+        return ProfileResponse(
+          success: false,
+          message: 'Failed to update profile.',
+        );
+      }
+    } catch (e) {
+      log('ProfileApi update: network error: $e');
+      return ProfileResponse(success: false, message: 'Network error: $e');
+    }
+  }
+
+  /// Global default profileId for all profile API calls
+  static const int defaultProfileId = 1;
   final String baseUrl;
 
   ProfileApi({String? baseUrl}) : baseUrl = baseUrl ?? ApiConfig.baseUrl;
@@ -39,7 +131,9 @@ class ProfileApi {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final url = Uri.parse('$normalizedBase/profile/create'); // Assuming endpoint
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/profiles/save',
+    ); // Assuming endpoint
     final body = jsonEncode({
       'name': name,
       'email': email,
@@ -86,7 +180,9 @@ class ProfileApi {
             final response = ProfileResponse.fromJson(jsonResp);
             return ProfileResponse(
               success: false,
-              message: response.message ?? 'Failed to create profile. Please check your details.',
+              message:
+                  response.message ??
+                  'Failed to create profile. Please check your details.',
             );
           } catch (_) {
             // If can't parse response, return default error
@@ -116,11 +212,15 @@ class ProfileApi {
   }
 
   /// Fetches the current user's profile and returns a [ProfileResponse].
-  Future<ProfileResponse> getProfile(int? profileId) async {
+  /// If [profileId] is not provided, uses [defaultProfileId].
+  Future<ProfileResponse> getProfile([int? profileId]) async {
+    final int id = profileId ?? defaultProfileId;
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/profiles/getById/$profileId'); // Assuming endpoint
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/profiles/getById/$id',
+    ); // Assuming endpoint
 
     // Debug prints (ok during development)
     log('ProfileApi get: GET $url');
@@ -135,7 +235,7 @@ class ProfileApi {
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
 
-      print(resp); 
+      print(resp);
 
       log('ProfileApi get: status=${resp.statusCode}');
       log('ProfileApi get: response=${resp.body}');
@@ -188,12 +288,16 @@ class ProfileApi {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    final url = Uri.parse('$normalizedBase/profile/photo'); // Assuming endpoint for photo upload
+    final url = Uri.parse(
+      '$normalizedBase/profile/photo',
+    ); // Assuming endpoint for photo upload
 
     // Multipart request for image
     var request = http.MultipartRequest('POST', url);
-    request.files.add(await http.MultipartFile.fromPath('photo', imageFile.path));
-    
+    request.files.add(
+      await http.MultipartFile.fromPath('photo', imageFile.path),
+    );
+
     // Add auth headers
     final headers = ApiUtils.getAuthenticatedHeaders();
     request.headers.addAll(headers);

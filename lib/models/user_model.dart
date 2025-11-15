@@ -11,6 +11,7 @@ class User {
   final bool? canManageChallans;
   final bool? canManageProfiles;
   final bool? canManageSettings;
+  final bool? canManagePassbook; // ← NEW FIELD
 
   User({
     required this.id,
@@ -23,6 +24,7 @@ class User {
     this.canManageChallans,
     this.canManageProfiles,
     this.canManageSettings,
+    this.canManagePassbook, // ← NEW FIELD
   });
 
   factory User.fromJson(Map<String, dynamic> json) {

@@ -75,51 +75,48 @@ class _CustomTextFieldState extends State<CustomTextField> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 64, // Kept taller for comfortable touch target
-      child: Container(
-        decoration: BoxDecoration(
-          color: widget.fillColor ?? Colors.white,
+    return TextField(
+      controller: _controller,
+      onChanged: widget.onChanged,
+      style: TextStyle(color: widget.textColor ?? Colors.black87),
+      obscureText: _obscureText,
+      keyboardType: widget.keyboardType,
+      textAlign: TextAlign.start, // Always left-aligned, no center for hint
+      textAlignVertical: TextAlignVertical.center,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hint,
+        hintStyle: widget.hintStyle ?? const TextStyle(color: Colors.grey),
+        labelStyle: TextStyle(color: widget.labelColor ?? Colors.grey),
+         enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(
+            color: Color.fromRGBO(147, 148, 150, 1),
+            width: 1.5,
+          ),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: widget.borderColor ?? Colors.grey.withOpacity(0.5),
-            width: 0.6,
-          ),
         ),
-        child: TextField(
-          controller: _controller,
-          onChanged: widget.onChanged,
-          style: TextStyle(color: widget.textColor ?? Colors.black87),
-          obscureText: _obscureText,
-          keyboardType: widget.keyboardType,
-          textAlign: TextAlign.start, // Always left-aligned, no center for hint
-          textAlignVertical: TextAlignVertical.center,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            hintText: widget.hint,
-            hintStyle: widget.hintStyle ?? const TextStyle(color: Colors.grey),
-            labelStyle: TextStyle(color: widget.labelColor ?? Colors.grey),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(left: 12, top: 0, bottom: 0),
-              child: Icon(widget.icon, color: widget.iconColor ?? Colors.grey),
-            ),
-            suffixIcon: widget.enablePasswordToggle
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 12, top: 0, bottom: 0),
-                    child: IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.grey,
-                      ),
-                      onPressed: _toggleObscure,
-                    ),
-                  )
-                : null,
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.black87, width: 2.0),
+          borderRadius: BorderRadius.circular(10),
         ),
+        // border: InputBorder.none,
+        contentPadding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 12, top: 0, bottom: 0),
+          child: Icon(widget.icon, color: widget.iconColor ?? Colors.grey),
+        ),
+        suffixIcon: widget.enablePasswordToggle
+            ? Padding(
+                padding: const EdgeInsets.only(right: 12, top: 0, bottom: 0),
+                child: IconButton(
+                  icon: Icon(
+                    _obscureText ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.grey,
+                  ),
+                  onPressed: _toggleObscure,
+                ),
+              )
+            : null,
       ),
     );
   }

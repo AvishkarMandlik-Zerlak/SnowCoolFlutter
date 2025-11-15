@@ -33,10 +33,11 @@ class UserApi {
     required String role,
     required bool active,
     required bool canCreateCustomer,
-    required bool canManageGoods,
+    required bool canManageGoodsItems,
     required bool canManageChallans,
     required bool canManageProfiles,
     required bool canManageSettings,
+    required bool canManagePassbook, // ← NEW FIELD
   }) async {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
@@ -49,10 +50,11 @@ class UserApi {
       'role': role,
       'active': active,
       'canCreateCustomer': canCreateCustomer,
-      'canManageGoods': canManageGoods,
+      'canManageGoodsItems': canManageGoodsItems,
       'canManageChallans': canManageChallans,
       'canManageProfiles': canManageProfiles,
       'canManageSettings': canManageSettings,
+      'canManagePassbook': canManagePassbook, // ← NEW IN BODY
     });
 
     log('UserApi createOrUpdateUser: POST $url');
@@ -70,7 +72,7 @@ class UserApi {
       log('Response: ${resp.body}');
 
       if (resp.statusCode == 200 || resp.statusCode == 201) {
-        // Backend returns full user object instead of a message
+        // Backend returns full user object or message
         String msg = id == null
             ? 'User created successfully'
             : 'User updated successfully';

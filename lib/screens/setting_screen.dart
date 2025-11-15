@@ -2,10 +2,12 @@
 import 'dart:convert';
 import 'dart:io' show File if (dart.library.io) 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // <-- ADD THIS
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lottie/lottie.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import '../services/application_settings_api.dart';
 import '../utils/token_manager.dart';
@@ -22,6 +24,10 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
   bool _isLoading = false;
   bool _isExisting = false;
 
+  // Control editability
+  bool _isEditableInvoicePrefix = true;
+  bool _isEditableChallanFormat = true;
+
   XFile? _logoXFile;
   XFile? _signatureXFile;
 
@@ -34,9 +40,14 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
   final TextEditingController _termsController = TextEditingController();
 
   ApplicationSettingsApi? _api;
+  ApplicationSettingsDTO? _loadedSettings;
 
-  // ---------- NEW: Validation ----------
+  // Validation
   String? _challanSequenceError;
+
+  // Default values
+  static const String _defaultInvoicePrefix = "INV-";
+  late final String _defaultChallanFormat = "CH-${DateTime.now().year}-";
 
   @override
   void initState() {
@@ -68,26 +79,30 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       if (settings != null) {
         setState(() {
           _isExisting = true;
+          _loadedSettings = settings;
+
           _invoicePrefixController.text = settings.invoicePrefix ?? "";
           _challanFormatController.text = settings.challanNumberFormat ?? "";
           _challanSequenceController.text = (settings.challanSequence ?? 1).toString();
           _termsController.text = settings.termsAndConditions ?? "";
 
-          _logoXFile = null;
-          _signatureXFile = null;
-
           _logoBase64 = settings.logoBase64;
           _signatureBase64 = settings.signatureBase64;
 
-          // Validate on load
+          _isEditableInvoicePrefix = true;
+          _isEditableChallanFormat = true;
+
           _validateChallanSequence(_challanSequenceController.text);
         });
       } else {
         setState(() {
           _isExisting = false;
+          _loadedSettings = null;
           _logoBase64 = null;
           _signatureBase64 = null;
           _validateChallanSequence("1");
+          _isEditableInvoicePrefix = true;
+          _isEditableChallanFormat = true;
         });
       }
     } catch (e) {
@@ -99,7 +114,6 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
     }
   }
 
-  // ---------- NEW: Challan Sequence Validation ----------
   void _validateChallanSequence(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
@@ -142,12 +156,27 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
     });
   }
 
-  // ---------- Safe Image Decoders ----------
+  // ✅ Fixed: Toggles default vs API-loaded values correctly
+  void _applyDefaultValues(bool? isChecked) {
+    setState(() {
+      if (isChecked == true) {
+        _invoicePrefixController.text = _defaultInvoicePrefix;
+        _challanFormatController.text = _defaultChallanFormat;
+        _isEditableInvoicePrefix = false;
+        _isEditableChallanFormat = false;
+      } else {
+        _isEditableInvoicePrefix = true;
+        _isEditableChallanFormat = true;
+        _invoicePrefixController.text = _loadedSettings?.invoicePrefix ?? "";
+        _challanFormatController.text = _loadedSettings?.challanNumberFormat ?? "";
+      }
+    });
+  }
+
   Widget _buildLogoImage() {
     if (_logoBase64 == null || _logoBase64!.isEmpty) {
       return const Icon(Icons.add_a_photo, size: 40, color: Colors.grey);
     }
-
     try {
       final bytes = base64Decode(_logoBase64!);
       return CircleAvatar(radius: 50, backgroundImage: MemoryImage(bytes));
@@ -158,7 +187,6 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
 
   DecorationImage? _buildSignatureImage() {
     if (_signatureBase64 == null || _signatureBase64!.isEmpty) return null;
-
     try {
       final bytes = base64Decode(_signatureBase64!);
       return DecorationImage(image: MemoryImage(bytes), fit: BoxFit.contain);
@@ -173,7 +201,6 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
       return;
     }
 
-    // Final validation before save
     _validateChallanSequence(_challanSequenceController.text);
     if (_challanSequenceError != null) {
       showErrorToast(context, "Please fix the Challan Sequence");
@@ -235,129 +262,199 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel("Logo"),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => _pickImage(true),
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey[200],
-                        child: _buildLogoImage(),
-                      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLabel("Logo"),
+                const SizedBox(height: 8),
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _pickImage(true),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[200],
+                      child: _buildLogoImage(),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                ),
+                const SizedBox(height: 20),
 
-                  _buildLabel("Invoice Prefix"),
-                  _buildTextField(_invoicePrefixController, "e.g., INV-"),
-                  const SizedBox(height: 16),
+                _buildLabel("Invoice Prefix"),
+                _buildTextField(_isEditableInvoicePrefix, _invoicePrefixController, "e.g., INV-"),
+                const SizedBox(height: 16),
 
-                  _buildLabel("Challan Number Format"),
-                  _buildTextField(_challanFormatController, "e.g., CH-YYYY-0001"),
-                  const SizedBox(height: 16),
+                _buildLabel("Challan Number Format"),
+                _buildTextField(_isEditableChallanFormat, _challanFormatController, "e.g., CH-YYYY-####"),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Spacer(),
+                    Checkbox(
+                      value: !_isEditableInvoicePrefix,
+                      activeColor: blueColor,
+                      onChanged: _applyDefaultValues,
+                    ),
+                    const Text(
+                      "Default",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel("Challan Sequence"),
-                            _buildTextField(
-                              _challanSequenceController,
-                              "e.g., 1",
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              onChanged: _validateChallanSequence,
-                              errorText: _challanSequenceError,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      GestureDetector(
-                        onTap: _resetSequence,
-                        child: Container(
-                          width: 100,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: blueColor, width: 2),
-                            borderRadius: BorderRadius.circular(10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel("Challan Sequence"),
+                          _buildTextField(
+                            true,
+                            _challanSequenceController,
+                            "e.g., 1",
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            onChanged: _validateChallanSequence,
+                            errorText: _challanSequenceError,
                           ),
-                          child: const Center(
-                            child: Text(
-                              "Reset",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildLabel("Terms & Conditions"),
-                  _buildTextField(_termsController, "e.g.,", maxLines: 3),
-                  const SizedBox(height: 20),
-
-                  _buildLabel("Upload Signature"),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => _pickImage(false),
-                    child: Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
                         ],
-                        image: _buildSignatureImage(),
                       ),
-                      child: _signatureBase64 == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.upload_file_rounded, size: 40, color: Colors.blueGrey.shade400),
-                                const SizedBox(height: 8),
-                                Text(
-                                  "Tap to upload signature",
-                                  style: TextStyle(color: Colors.blueGrey.shade600, fontSize: 14, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            )
-                          : null,
                     ),
-                  ),
-                  const SizedBox(height: 25),
+                    const SizedBox(width: 10),
+                    Column(
+                      children: [
+                        const SizedBox(height: 30),
+                        GestureDetector(
+                          onTap: _resetSequence,
+                          child: Container(
+                            width: 100,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: blueColor, width: 2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.refresh_outlined, color: blueColor),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "Reset",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: _challanSequenceError != null ? null : _saveSettings,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: blueColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        _isExisting ? "Update" : "Save",
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
+                _buildLabel("Terms & Conditions"),
+                _buildTextField(true, _termsController, "e.g.,", maxLines: 3),
+                const SizedBox(height: 20),
+
+                _buildLabel("Upload Signature"),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _pickImage(false),
+                  child: Container(
+                    height: 120,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                      ],
+                      image: _buildSignatureImage(),
+                    ),
+                    child: _signatureBase64 == null
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.upload_file_rounded, size: 40, color: Colors.blueGrey.shade400),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Tap to upload signature",
+                                style: TextStyle(
+                                  color: Colors.blueGrey.shade600,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          )
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 25),
+
+                Center(
+                  child: ElevatedButton(
+                    onPressed: _challanSequenceError != null ? null : _saveSettings,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: blueColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      _isExisting ? "Update" : "Save",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 50),
+              ],
+            ),
+          ),
+
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Lottie.asset('assets/lottie/oxygen cylinder.json', width: 120, height: 120, fit: BoxFit.cover),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "Please wait...",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: blueColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
+        ],
+      ),
     );
   }
 
@@ -369,8 +466,8 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
         ),
       );
 
-  // Updated _buildTextField to support errorText, onChanged, etc.
   Widget _buildTextField(
+    bool isEditable,
     TextEditingController controller,
     String hint, {
     int maxLines = 1,
@@ -380,12 +477,17 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
     String? errorText,
   }) {
     return TextField(
+      readOnly: !isEditable,
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       onChanged: onChanged,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color.fromRGBO(20, 20, 20, 1)),
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: isEditable ? const Color.fromRGBO(20, 20, 20, 1) : Colors.grey.shade600,
+      ),
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         hintText: hint,
@@ -396,6 +498,10 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: Color.fromRGBO(0, 140, 192, 1)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade400),
           borderRadius: BorderRadius.circular(8),
         ),
         errorText: errorText,

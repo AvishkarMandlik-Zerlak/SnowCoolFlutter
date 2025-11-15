@@ -70,9 +70,9 @@ class ViewUserApi {
   // --------------------------------------------------------------
   //  PUT  api/v1/settings/users/{id}/status
   // --------------------------------------------------------------
-  Future<UserResponse> updateUserStatus(int userId, bool isActive) async {
+  Future<UserResponse> updateUserStatus(String userName, bool isActive) async {
     final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-    final url = Uri.parse('$normalizedBase/api/v1/settings/users/$userId/status');
+    final url = Uri.parse('$normalizedBase/api/v1/settings/users/$userName/status?active=$isActive');
     final headers = ApiUtils.getAuthenticatedHeaders();
     final body = jsonEncode({'active': isActive});
 

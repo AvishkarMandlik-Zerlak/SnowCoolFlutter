@@ -1,4 +1,3 @@
-
 /// Simple token manager to store and retrieve authentication tokens
 class TokenManager {
   static final TokenManager _instance = TokenManager._internal();
@@ -13,45 +12,70 @@ class TokenManager {
   int? _id;        // Added: user id (Long)
   String? _role;    // Changed: username to role
 
-  /// Store the authentication token
-  void setToken(String? token) {
-    _token = token;
-  }
+  // ──────────────────────────────────────────────────────────────
+  // NEW PERMISSION FLAGS (added without touching the old code)
+  // ──────────────────────────────────────────────────────────────
+  bool? _canCreateCustomers;
+  bool? _canManageChallans;
+  bool? _canManageGoodsItems;
+  bool? _canManageProfiles;
+  bool? _canManageSettings;
+  bool? _canManagePassbook;
 
-  /// Get the current authentication token
-  String? getToken() {
-    return _token;
-  }
 
-  /// Store the user id
-  void setId(int? id) {
-    _id = id;
-  }
+  // ──────────────────────────────────────────────────────────────
+  // ORIGINAL GETTERS / SETTERS (unchanged)
+  // ──────────────────────────────────────────────────────────────
+  void setToken(String? token) => _token = token;
+  String? getToken() => _token;
 
-  /// Get the current user id
-  int? getId() {
-    return _id;
-  }
+  void setId(int? id) => _id = id;
+  int? getId() => _id;
 
-  /// Store the user role
-  void setRole(String? role) {
-    _role = role;
-  }
+  void setRole(String? role) => _role = role;
+  String? getRole() => _role;
 
-  /// Get the current user role
-  String? getRole() {
-    return _role;
-  }
+  // ──────────────────────────────────────────────────────────────
+  // NEW PERMISSION GETTERS (safe defaults = false)
+  // ──────────────────────────────────────────────────────────────
+  bool get canCreateCustomers   => _canCreateCustomers ?? false;
+  bool get canManageChallans    => _canManageChallans ?? false;
+  bool get canManageGoodsItems  => _canManageGoodsItems ?? false;
+  bool get canManageProfiles    => _canManageProfiles ?? false;
+  bool get canManageSettings    => _canManageSettings ?? false;
+  bool get canManagePassbook    => _canManagePassbook ?? false;
 
-  /// Clear the stored token, id and role (for logout)
+
+  // ──────────────────────────────────────────────────────────────
+  // ORIGINAL CLEAR METHOD (extended to wipe new fields)
+  // ──────────────────────────────────────────────────────────────
   void clearToken() {
     _token = null;
     _id = null;
     _role = null;
+
+    // NEW: also clear permissions
+    _canCreateCustomers   = null;
+    _canManageChallans    = null;
+    _canManageGoodsItems  = null;
+    _canManageProfiles    = null;
+    _canManageSettings    = null;
+    _canManagePassbook    = null;
   }
 
-  /// Check if user is authenticated
-  bool isAuthenticated() {
-    return _token != null && _token!.isNotEmpty;
+  bool isAuthenticated() => _token != null && _token!.isNotEmpty;
+
+  // ──────────────────────────────────────────────────────────────
+  // NEW: Fill permission flags from login JSON
+  // ──────────────────────────────────────────────────────────────
+  /// Call this after you have already called setToken / setId / setRole.
+  /// It only extracts the permission booleans.
+  void setPermissionsFromJson(Map<String, dynamic> json) {
+    _canCreateCustomers   = json['canCreateCustomers'] as bool?;
+    _canManageChallans    = json['canManageChallans'] as bool?;
+    _canManageGoodsItems  = json['canManageGoodsItems'] as bool?;
+    _canManageProfiles    = json['canManageProfiles'] as bool?;
+    _canManageSettings    = json['canManageSettings'] as bool?;
+    _canManagePassbook    = json['canManagePassbook'] as bool?;
   }
 }

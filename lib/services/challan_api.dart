@@ -1,6 +1,5 @@
 // challan_api.dart
 import 'dart:convert';
-import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../utils/api_config.dart';
@@ -28,7 +27,7 @@ class ChallanApi {
   // CREATE CHALLAN
   // -------------------------------------------------------------------------
   Future<bool> createChallan({
-    required int customerId,
+    int? customerId,
     required String customerName,
     required String challanType,
     required String location,
@@ -38,28 +37,32 @@ class ChallanApi {
     required String driverNumber,
     required String contactNumber,
     required List<Map<String, dynamic>> items,
+    required String email,
     required String date,
+    String? address,
   }) async {
     try {
       final Map<String, dynamic> body = {
-        'customerId': customerId,
+        if (customerId != null) 'customerId': customerId,
         'customerName': customerName,
         'challanType': challanType,
         'siteLocation': location,
         'transporter': transporter,
         'vehicleNumber': vehicleNumber,
         'driverName': driverName,
-        'driverNumber': driverNumber, // <-- EXACT KEY
+        'driverNumber': driverNumber,
         'contactNumber': contactNumber,
-        'date': date, // <-- EXACT KEY
-        'challanNumber': 'AUTO', // <-- EXACT KEY (backend will generate)
+        'email': email,
+        if (address != null && address.isNotEmpty) 'address': address,
+        'date': date,
+        'challanNumber': 'AUTO',
         'items': items
             .map(
               (item) => {
-                'name': item['product'],
-                'qty': item['quantity'],
-                'srNo': item['serialNumber'],
-                'batchRef': item['serialNumber'], // required by backend
+                'name': item['name'],
+                'qty': item['qty'],
+                'srNo': item['srNo'],
+                'batchRef': item['srNo'],
               },
             )
             .toList(),
@@ -108,7 +111,6 @@ class ChallanApi {
           final String displayType =
               typeStr.substring(0, 1) + typeStr.substring(1).toLowerCase();
 
-          // ---- Safe qty sum ----
           final List<dynamic>? itemsList = j['items'] as List<dynamic>?;
           final int totalQty =
               itemsList?.fold<int>(0, (int sum, dynamic item) {
@@ -136,9 +138,9 @@ class ChallanApi {
   }
 
   // -------------------------------------------------------------------------
-  // GET SINGLE CHALLAN
+  // GET SINGLE CHALLAN — FIXED: Now returns email, address, etc.
   // -------------------------------------------------------------------------
-  Future<Map<String, dynamic>> getChallan(int id) async {
+  Future<Map<String, dynamic>?> getChallan(int id) async {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
@@ -150,24 +152,77 @@ class ChallanApi {
           .timeout(const Duration(seconds: 10));
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        return jsonDecode(resp.body) as Map<String, dynamic>;
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+
+        // ENSURE all required fields are present (even if null)
+        return {
+          'id': data['id'],
+          'customerId': data['customerId'],
+          'customerName': data['customerName'] ?? '',
+          'contactNumber': data['contactNumber'] ?? '',
+          'customerEmail': data['email'] ?? '',
+          'siteLocation': data['siteLocation'] ?? '',
+          'transporter': data['transporter'] ?? '',
+          'vehicleNumber': data['vehicleNumber'] ?? '',
+          'driverName': data['driverName'] ?? '',
+          'driverNumber': data['driverNumber'] ?? '',
+          'date': data['date'] ?? '',
+          'challanType': data['challanType'] ?? 'RECEIVE',
+          'items': data['items'] ?? [],
+        };
       } else {
-        throw Exception('Failed to fetch challan: ${resp.statusCode}');
+        debugPrint(
+          'Failed to fetch challan: ${resp.statusCode} - ${resp.body}',
+        );
+        return null;
       }
     } catch (e) {
       debugPrint('Error fetching challan: $e');
-      throw Exception('Error fetching challan: $e');
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // DELETE MULTIPLE CHALLANS — NOW USING http (consistent with rest of API)
+  // -------------------------------------------------------------------------
+  Future<bool> deleteMultipleChallans(List<int> ids) async {
+    if (ids.isEmpty) return false;
+
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final url = Uri.parse(
+      '$normalizedBase/api/v1/challans/deleteMultipleChallans',
+    );
+
+    try {
+      debugPrint('Deleting multiple challans: $ids');
+
+      final response = await http
+          .post(url, headers: _getHeaders(), body: jsonEncode(ids))
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        debugPrint('Multiple challans deleted successfully');
+        return true;
+      } else {
+        debugPrint(
+          'Delete multiple failed: ${response.statusCode} - ${response.body}',
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Exception in deleteMultipleChallans: $e');
+      return false;
     }
   }
 
   // -------------------------------------------------------------------------
   // UPDATE CHALLAN
   // -------------------------------------------------------------------------
-  Future<bool> updateChallan(
-    // Map<String, dynamic> dto, 
-    {
+  Future<bool> updateChallan({
     required int challanId,
-    required int customerId,
+    int? customerId,
     required String customerName,
     required String challanType,
     required String location,
@@ -178,6 +233,8 @@ class ChallanApi {
     required String contactNumber,
     required List<Map<String, dynamic>> items,
     required String date,
+    required String email,
+    String? address,
   }) async {
     final normalizedBase = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
@@ -187,11 +244,44 @@ class ChallanApi {
     );
 
     try {
+      final Map<String, dynamic> body = {
+        if (customerId != null) 'customerId': customerId,
+        'customerName': customerName,
+        'challanType': challanType,
+        'siteLocation': location,
+        'transporter': transporter,
+        'vehicleNumber': vehicleNumber,
+        'driverName': driverName,
+        'driverNumber': driverNumber,
+        'contactNumber': contactNumber,
+        'email': email,
+        if (address != null && address.isNotEmpty) 'address': address,
+        'date': date,
+        'items': items
+            .map(
+              (item) => {
+                'name': item['name'],
+                'qty': item['qty'],
+                'srNo': item['srNo'],
+                'batchRef': item['srNo'],
+              },
+            )
+            .toList(),
+      };
+
+      debugPrint('Update Payload: ${jsonEncode(body)}');
+
       final resp = await http
-          .put(url, headers: _getHeaders(), body: jsonEncode(items))
+          .put(url, headers: _getHeaders(), body: jsonEncode(body))
           .timeout(const Duration(seconds: 10));
 
-      return resp.statusCode >= 200 && resp.statusCode < 300;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        debugPrint('Challan Updated Successfully');
+        return true;
+      } else {
+        debugPrint('Update Failed: ${resp.statusCode} - ${resp.body}');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error updating challan: $e');
       return false;
@@ -199,7 +289,7 @@ class ChallanApi {
   }
 
   // -------------------------------------------------------------------------
-  // DELETE CHALLAN
+  // DELETE SINGLE CHALLAN
   // -------------------------------------------------------------------------
   Future<bool> deleteChallan(int id) async {
     final normalizedBase = baseUrl.endsWith('/')
@@ -214,7 +304,13 @@ class ChallanApi {
           .delete(url, headers: _getHeaders())
           .timeout(const Duration(seconds: 10));
 
-      return resp.statusCode >= 200 && resp.statusCode < 300;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        debugPrint('Challan $id deleted successfully');
+        return true;
+      } else {
+        debugPrint('Delete failed: ${resp.statusCode} - ${resp.body}');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error deleting challan: $e');
       return false;

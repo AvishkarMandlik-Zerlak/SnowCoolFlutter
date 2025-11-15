@@ -49,25 +49,47 @@ class _UserViewScreenState extends State<UserViewScreen> {
 
   List<User> _getDemoUsers() {
     return [
-      User(id: 1, username: 'demo_user1', password: 'demo123', role: 'Employee', active: true),
-      User(id: 2, username: 'admin_demo', password: 'admin456', role: 'Admin', active: false),
-      User(id: 3, username: 'test_emp', password: 'test789', role: 'Employee', active: true),
+      User(
+        id: 1,
+        username: 'demo_user1',
+        password: 'demo123',
+        role: 'Employee',
+        active: true,
+      ),
+      User(
+        id: 2,
+        username: 'admin_demo',
+        password: 'admin456',
+        role: 'Admin',
+        active: false,
+      ),
+      User(
+        id: 3,
+        username: 'test_emp',
+        password: 'test789',
+        role: 'Employee',
+        active: true,
+      ),
     ];
   }
 
   Future<void> _toggleUserStatus(User user, bool newStatus) async {
     try {
-      final response = await _api.updateUserStatus(user.id, newStatus);
+      final response = await _api.updateUserStatus(user.username, newStatus);
       if (response.success) {
         if (mounted) {
           setState(() {
             user.active = newStatus;
           });
           showSuccessToast(context, "User status updated successfully!");
+          
         }
       } else {
         if (mounted) {
-          showErrorToast(context, "Failed to update user status: ${response.message}");
+          showErrorToast(
+            context,
+            "Failed to update user status: ${response.message}",
+          );
           setState(() {
             user.active = !newStatus; // Revert on failure
           });
@@ -84,7 +106,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
   }
 
   // Helper for permission toggle row (ultra-compact with IconButton)
-  Widget _buildPermissionRow(String label, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildPermissionRow(
+    String label,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1.0), // Minimal vertical
       child: Row(
@@ -93,10 +119,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.inter(
-                fontSize: 11, // Smaller text
-                fontWeight: FontWeight.w500,
+              style: GoogleFonts.poppins(
+                fontSize: 13, // Slightly larger for clarity
+                fontWeight: FontWeight.w600,
                 color: Colors.black87,
+                letterSpacing: 0.2,
               ),
             ),
           ),
@@ -105,7 +132,7 @@ class _UserViewScreenState extends State<UserViewScreen> {
             icon: Icon(
               value ? Icons.toggle_on : Icons.toggle_off,
               color: value ? const Color.fromRGBO(0, 140, 192, 1) : Colors.grey,
-              size: 60, // Compact size to match photo style
+              size: 34, // reasonable size for toggle
             ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -120,9 +147,7 @@ class _UserViewScreenState extends State<UserViewScreen> {
   Future<void> _editUser(User user) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => UserCreateScreen(user: user),
-      ),
+      MaterialPageRoute(builder: (context) => UserCreateScreen(user: user)),
     );
     _loadUsers(); // Refresh list after edit
   }
@@ -155,7 +180,10 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   });
                   showSuccessToast(context, "User deleted successfully!");
                 } else {
-                  showErrorToast(context, "Failed to delete user: ${response.message}");
+                  showErrorToast(
+                    context,
+                    "Failed to delete user: ${response.message}",
+                  );
                 }
               } catch (e) {
                 if (!dialogContext.mounted) return;
@@ -222,7 +250,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'No users found',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey),
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey,
+                      ),
                     ),
                   ],
                 ),
@@ -241,7 +273,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
         icon: const Icon(Icons.person_add, color: Colors.white),
         label: Text(
           'Add User',
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
         tooltip: 'Add New User',
       ),
@@ -249,52 +285,180 @@ class _UserViewScreenState extends State<UserViewScreen> {
   }
 
   Widget _buildUserCard(User user, bool isMobile) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      margin: const EdgeInsets.only(bottom: 8),
-      child: IntrinsicHeight(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.edit, size: 16, color: Colors.blue),
-                    onPressed: () => _editUser(user),
-                    tooltip: 'Edit User',
+    final initials = (user.username.isNotEmpty)
+        ? user.username
+              .trim()
+              .split(' ')
+              .map((s) => s.isNotEmpty ? s[0] : '')
+              .take(2)
+              .join()
+              .toUpperCase()
+        : 'U';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          vertical: isMobile ? 10 : 14,
+          horizontal: isMobile ? 10 : 14,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                // Avatar
+                Container(
+                  width: isMobile ? 44 : 52,
+                  height: isMobile ? 44 : 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00A3D9), Color(0xFF1976D2)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
-                  const SizedBox(width: 8.0),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                    onPressed: () => _deleteUser(user),
-                    tooltip: 'Delete User',
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: isMobile ? 14 : 16,
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              Expanded(child: _buildUserField('Username', user.username, Icons.person, isMobile)),
-              const SizedBox(height: 2),
-              Expanded(child: _buildPasswordField(user)),
-              const SizedBox(height: 2),
-              Expanded(child: _buildUserField('Role', user.role, Icons.admin_panel_settings, isMobile)),
-              const SizedBox(height: 4),
-              _buildPermissionRow('Active', user.active, (newValue) => _toggleUserStatus(user, newValue)),
-            ],
-          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.username,
+                        style: GoogleFonts.poppins(
+                          fontSize: isMobile ? 14 : 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.role,
+                        style: GoogleFonts.poppins(
+                          fontSize: isMobile ? 12 : 13,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Overflow menu
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Colors.black54),
+                    tooltip: 'More options',
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') _editUser(user);
+                      if (value == 'delete') _deleteUser(user);
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.manage_accounts,
+                              color: Color(0xFF1976D2),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Edit',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.person_remove,
+                              color: Colors.red,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: isMobile ? 10 : 12),
+            _buildUserField('Username', user.username, Icons.person, isMobile),
+            SizedBox(height: isMobile ? 8 : 10),
+            _buildPasswordField(user, isMobile),
+            SizedBox(height: isMobile ? 8 : 10),
+            _buildUserField(
+              'Role',
+              user.role,
+              Icons.admin_panel_settings,
+              isMobile,
+            ),
+            SizedBox(height: isMobile ? 10 : 12),
+            _buildPermissionRow(
+              'Active',
+              user.active,
+              (newValue) => _toggleUserStatus(user, newValue),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildUserField(String label, String value, IconData icon, bool isMobile) {
+  Widget _buildUserField(
+    String label,
+    String value,
+    IconData icon,
+    bool isMobile,
+  ) {
     return Row(
       children: [
         Icon(icon, color: const Color.fromRGBO(0, 140, 192, 1), size: 14),
@@ -306,14 +470,21 @@ class _UserViewScreenState extends State<UserViewScreen> {
             children: [
               Text(
                 label,
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.black87),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 1),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   value.isEmpty ? 'Not set' : value,
-                  style: GoogleFonts.inter(fontSize: 12, color: value.isEmpty ? Colors.grey : Colors.black87),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: value.isEmpty ? Colors.grey : Colors.black87,
+                  ),
                 ),
               ),
             ],
@@ -323,9 +494,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
     );
   }
 
-  Widget _buildPasswordField(User user) {
+  Widget _buildPasswordField(User user, bool isMobile) {
     final bool isVisible = _passwordVisibility[user.id] ?? false;
-    final String displayPassword = isVisible ? user.password : '*' * user.password.length;
+    final String displayPassword = isVisible
+        ? user.password
+        : '*' * user.password.length;
 
     return Row(
       children: [
@@ -344,7 +517,11 @@ class _UserViewScreenState extends State<UserViewScreen> {
               children: [
                 const Text(
                   'Password',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 1),
                 FittedBox(
@@ -352,9 +529,19 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(displayPassword, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                      Text(
+                        displayPassword,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                      ),
                       const SizedBox(width: 4),
-                      Icon(isVisible ? Icons.visibility_off : Icons.visibility, size: 12, color: Colors.grey),
+                      Icon(
+                        isVisible ? Icons.visibility_off : Icons.visibility,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                     ],
                   ),
                 ),

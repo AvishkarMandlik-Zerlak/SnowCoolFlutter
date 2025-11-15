@@ -1,9 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:data_table_2/data_table_2.dart';
-import 'package:snow_trading_cool/services/customer_store_api.dart';
+import 'package:snow_trading_cool/screens/create_customer_screen.dart';
+import 'package:snow_trading_cool/services/customer_api.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
-// import 'package:snow_trading_cool/screens/view_customer_screennew.dart';
-import '../services/customer_api.dart';
 
 class ViewCustomerScreenFixed extends StatefulWidget {
   const ViewCustomerScreenFixed({super.key});
@@ -17,24 +16,19 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
   final CustomerApi _api = CustomerApi();
   final TextEditingController _searchController = TextEditingController();
 
-  bool _isLoading = true;
-  late CustomerStore _store;
-
-  int _rowsPerPage = 8;
-  int _currentPage = 1;
-  final List<int> _availableRowsPerPage = [5, 8, 10, 20];
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _customers = [];
+  String _searchQuery = '';
+  int _currentPage = 0;
+  final int _rowsPerPage = 10;
+  int _totalPages = 1;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _fetchCustomers();
     _searchController.addListener(() {
-      if (!_isLoading) {
-        _store.applyFilter(_searchController.text);
-        setState(() {
-          _currentPage = 1;
-        });
-      }
+      setState(() => _searchQuery = _searchController.text);
     });
   }
 
@@ -44,25 +38,61 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// 🔹 Fetch paginated customers from backend
+  Future<void> _fetchCustomers({int page = 0}) async {
     setState(() => _isLoading = true);
     try {
-      final customers = await _api.getAllCustomers();
-      _store = CustomerStore(customers);
+      final response = await _api.getCustomersPage(
+        page: page,
+        size: _rowsPerPage,
+      );
+      final customers = response.content;
+
+      setState(() {
+        _customers = customers
+            .map(
+              (c) => {
+                'id': c.id,
+                'name': c.name,
+                'contactNumber': c.contactNumber,
+                'email': c.email ?? '',
+                'address': c.address ?? '',
+              },
+            )
+            .toList();
+
+        _currentPage = response.number;
+        _totalPages = response.totalPages;
+        _isLoading = false;
+      });
     } catch (e) {
-      _store = CustomerStore(_demoCustomers());
+      setState(() => _isLoading = false);
       if (mounted) {
-        showWarningToast(context, "Failed to load customers, using demo data");
+        showErrorToast(context, "Failed to load customers");
       }
     }
-    setState(() => _isLoading = false);
   }
 
-  Future<void> _editCustomer(CustomerDTO c) async {
-    final name = TextEditingController(text: c.name);
-    final mobile = TextEditingController(text: c.contactNumber);
-    final email = TextEditingController(text: c.email ?? '');
-    final address = TextEditingController(text: c.address ?? '');
+  List<Map<String, dynamic>> get _filteredData {
+    final query = _searchQuery.toLowerCase();
+    if (query.isEmpty) return _customers;
+    return _customers.where((customer) {
+      final name = (customer['name'] ?? '').toString().toLowerCase();
+      final contact = (customer['contactNumber'] ?? '')
+          .toString()
+          .toLowerCase();
+      final email = (customer['email'] ?? '').toString().toLowerCase();
+      return name.contains(query) ||
+          contact.contains(query) ||
+          email.contains(query);
+    }).toList();
+  }
+
+  Future<void> _editCustomer(Map<String, dynamic> customer) async {
+    final name = TextEditingController(text: customer['name'] ?? '');
+    final mobile = TextEditingController(text: customer['contactNumber'] ?? '');
+    final email = TextEditingController(text: customer['email'] ?? '');
+    final address = TextEditingController(text: customer['address'] ?? '');
 
     final res = await showDialog<bool>(
       context: context,
@@ -108,32 +138,30 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
 
     try {
       final resp = await _api.updateCustomer(
-        c.id,
+        customer['id'],
         name.text,
         mobile.text,
         email.text,
         address.text,
       );
       if (resp.success) {
-        await _load();
+        await _fetchCustomers(page: _currentPage);
         if (mounted)
-        showSuccessToast(context, "Customer updated successfully!");
+          showSuccessToast(context, "Customer updated successfully!");
       } else {
-        if (mounted)
-        showErrorToast(context, 'Update failed: ${resp.message}');
+        if (mounted) showErrorToast(context, 'Update failed: ${resp.message}');
       }
     } catch (e) {
-      if (mounted)
-      showErrorToast(context, 'Error: $e');
+      if (mounted) showErrorToast(context, 'Error: $e');
     }
   }
 
-  Future<void> _deleteCustomer(CustomerDTO c) async {
+  Future<void> _deleteCustomer(int customerId) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: Text('Are you sure you want to delete ${c.name}?'),
+        content: const Text('Are you sure you want to delete this customer?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -151,325 +179,348 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
     if (confirmed != true) return;
 
     try {
-      final resp = await _api.deleteCustomer(c.id);
+      final resp = await _api.deleteCustomer(customerId);
       if (resp.success) {
-        await _load();
+        await _fetchCustomers(page: _currentPage);
         if (mounted)
-        showSuccessToast(context, "Customer deleted successfully!");
+          showSuccessToast(context, "Customer deleted successfully!");
       } else {
-        if (mounted)
-        showErrorToast(context, 'Delete failed: ${resp.message}');
+        if (mounted) showErrorToast(context, 'Delete failed: ${resp.message}');
       }
     } catch (e) {
-      if (mounted)
-      showErrorToast(context, 'Error: $e');
+      if (mounted) showErrorToast(context, 'Error: $e');
     }
-  }
-
-  List<CustomerDTO> _pageItems() {
-    final total = _store.filteredCount;
-    final start = (_currentPage - 1) * _rowsPerPage;
-    if (start >= total) return [];
-    final end = (start + _rowsPerPage) > total ? total : (start + _rowsPerPage);
-    return _store.getRange(start, end);
-  }
-
-  int _totalPages() {
-    final total = _store.filteredCount;
-    return total == 0 ? 1 : ((total / _rowsPerPage).ceil());
-  }
-
-  String _pageRangeText() {
-    final total = _store.filteredCount;
-    if (total == 0) return '0-0 of 0';
-    final start = (_currentPage - 1) * _rowsPerPage + 1;
-    final end = (_currentPage * _rowsPerPage) < total
-        ? (_currentPage * _rowsPerPage)
-        : total;
-    return '$start-$end of $total';
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
-
-    if (_isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color.fromRGBO(0, 140, 192, 1),
         title: const Text('View Customers'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            // Search
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color.fromRGBO(0, 140, 192, 1),
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: 'Search...',
-                        icon: Icon(Icons.search),
-                      ),
-                    ),
+         actions: [
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const CreateCustomerScreen()),
+              );
+            },
+            child: Container(
+              height: 30,
+              width: 110,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: const Color.fromRGBO(0, 140, 192, 1),
+              ),
+              child: const Center(
+                child: Text(
+                  "Create Customer",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
                   ),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-
-            // Table area
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // leave room for footer
-                  const footerHeight = 72.0; // approx
-                  final tableHeight = constraints.maxHeight - footerHeight;
-                  final double nameColWidth = isMobile
-                      ? 140
-                      : (isTablet ? 180 : 220);
-                  final double rightAreaWidth = isMobile
-                      ? 640
-                      : (isTablet ? 760 : 900);
-
-                  final items = _pageItems();
-
-                  Widget nameTable(double height) => SizedBox(
-                    width: nameColWidth,
-                    height: height,
-                    child: DataTable2(
-                      columns: [
-                        DataColumn2(
-                          label: Text(
-                            'Customer Name',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
-                        ),
-                      ],
-                      headingRowColor: MaterialStateProperty.all(
-                        Colors.grey.shade50,
-                      ),
-                      minWidth: nameColWidth,
-                      rows: items
-                          .map((c) => DataRow(cells: [DataCell(Text(c.name))]))
-                          .toList(),
-                    ),
-                  );
-
-                  Widget otherTable(double height) => SizedBox(
-                    width: rightAreaWidth,
-                    height: height,
-                    child: DataTable2(
-                      columns: [
-                        DataColumn2(
-                          size: ColumnSize.M,
-                          label: Text(
-                            'Mobile Number',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
-                        ),
-                        DataColumn2(
-                          size: ColumnSize.M,
-                          label: Text(
-                            'Email',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
-                        ),
-                        DataColumn2(
-                          size: ColumnSize.L,
-                          label: Text(
-                            'Address',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
-                        ),
-                        DataColumn2(
-                          size: ColumnSize.S,
-                          label: Text(
-                            'Actions',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
-                        ),
-                      ],
-                      headingRowColor: MaterialStateProperty.all(
-                        Colors.grey.shade50,
-                      ),
-                      minWidth: rightAreaWidth,
-                      columnSpacing: 12,
-                      rows: items
-                          .map(
-                            (c) => DataRow(
-                              cells: [
-                                DataCell(Text(c.contactNumber)),
-                                DataCell(Text(c.email ?? '')),
-                                DataCell(Text(c.address ?? '')),
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 18),
-                                        color: Colors.blue,
-                                        onPressed: () => _editCustomer(c),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => _fetchCustomers(page: _currentPage),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 0),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: [
+                            // 🔍 Search box
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Wrap(
+                                spacing: 10,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: isMobile ? screenWidth - 32 : 250,
+                                    child: TextField(
+                                      controller: _searchController,
+                                      decoration: const InputDecoration(
+                                        prefixIcon: Icon(Icons.search),
+                                        labelText:
+                                            'Search by name, contact, or email',
+                                        border: OutlineInputBorder(),
                                       ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            Row(
+                              children: [
+                                Column(
+                                  children: [
+                                    Container(
+                                      height: 50,
+                                      color: Colors.grey.shade50,
+                                      child: const Center(
+                                        child: Text(
+                                          'Name',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: Color.fromRGBO(
+                                              0,
+                                              140,
+                                              192,
+                                              1,
+                                            ),
+                                          ),
                                         ),
-                                        color: Colors.red,
-                                        onPressed: () => _deleteCustomer(c),
                                       ),
-                                    ],
+                                    ),
+                                    ..._filteredData.map((row) {
+                                      return Container(
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            bottom: BorderSide(
+                                              color: Colors.grey.shade300,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: Text(row['name'] ?? 'N/A'),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+
+                                // Data columns
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: 700,
+                                      child: Column(
+                                        children: [
+                                          // Header
+                                          Container(
+                                            height: 50,
+                                            color: Colors.grey.shade50,
+                                            child: const Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 150,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Mobile Number',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color.fromRGBO(
+                                                          0,
+                                                          140,
+                                                          192,
+                                                          1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 200,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Email',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color.fromRGBO(
+                                                          0,
+                                                          140,
+                                                          192,
+                                                          1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 200,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Address',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color.fromRGBO(
+                                                          0,
+                                                          140,
+                                                          192,
+                                                          1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 150,
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Actions',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color.fromRGBO(
+                                                          0,
+                                                          140,
+                                                          192,
+                                                          1,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // Rows
+                                          ..._filteredData.map((row) {
+                                            return Container(
+                                              height: 50,
+                                              decoration: BoxDecoration(
+                                                border: Border(
+                                                  bottom: BorderSide(
+                                                    color: Colors.grey.shade300,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 150,
+                                                    child: Center(
+                                                      child: Text(
+                                                        row['contactNumber'] ??
+                                                            'N/A',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(
+                                                    width: 200,
+                                                    child: Center(
+                                                      child: Text(
+                                                        row['email'] ?? 'N/A',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(
+                                                    width: 200,
+                                                    child: Center(
+                                                      child: Text(
+                                                        row['address'] ?? 'N/A',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(
+                                                    width: 150,
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        IconButton(
+                                                         icon: Icon(
+                                                              CupertinoIcons.square_pencil_fill, color: Color.fromRGBO(
+                                                                0,
+                                                                140,
+                                                                192,
+                                                                1,
+                                                              ),
+                                                            ),
+                                                          onPressed: () =>
+                                                              _editCustomer(
+                                                                row,
+                                                              ),
+                                                        ),
+                                                        IconButton(
+                                                          icon: Icon(
+                                                              CupertinoIcons.bin_xmark_fill, color: Colors.red
+                                                            ),
+                                                          onPressed: () {
+                                                            final id =
+                                                                int.tryParse(
+                                                                  row['id']
+                                                                      .toString(),
+                                                                ) ??
+                                                                0;
+                                                            _deleteCustomer(id);
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                          )
-                          .toList(),
-                    ),
-                  );
-
-                  // Tablet / Desktop and Mobile: side-by-side (keep Customer Name fixed on the left,
-                  // other columns horizontally scrollable on the right). User requested the mobile
-                  // view behave like tablet view (no stacked name column), so we render the same layout
-                  // for all screen sizes.
-                  return Container(
-                    height: tableHeight,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: const Color.fromRGBO(238, 238, 238, 1),
+                          ],
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      children: [
-                        nameTable(tableHeight),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: otherTable(tableHeight),
+
+                    // Pagination footer (no extra space below)
+                    Container(
+                      color: const Color(0xFFB3E0F2),
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios),
+                            onPressed: _currentPage > 0
+                                ? () => _fetchCustomers(page: _currentPage - 1)
+                                : null,
                           ),
-                        ),
-                      ],
+                          Text('Page ${_currentPage + 1} of $_totalPages'),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_forward_ios),
+                            onPressed: _currentPage < _totalPages - 1
+                                ? () => _fetchCustomers(page: _currentPage + 1)
+                                : null,
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-
-            // Footer (fixed)
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8.0,
-                vertical: 4.0,
-              ),
-              child: Row(
-                children: [
-                  // Left: takes remaining space and can shrink if necessary
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Text('Rows per page: '),
-                        DropdownButton<int>(
-                          value: _rowsPerPage,
-                          items: _availableRowsPerPage
-                              .map(
-                                (v) => DropdownMenuItem(
-                                  value: v,
-                                  child: Text(v.toString()),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() {
-                              _rowsPerPage = v;
-                              _currentPage = 1;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Right: size to its content so it won't force overflow
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left),
-                        onPressed: _currentPage > 1
-                            ? () => setState(() => _currentPage--)
-                            : null,
-                      ),
-                      Flexible(
-                        child: Text(
-                          _pageRangeText(),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right),
-                        onPressed: _currentPage < _totalPages()
-                            ? () => setState(() => _currentPage++)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // demo data
-  List<CustomerDTO> _demoCustomers() {
-    return List.generate(
-      120,
-      (i) => CustomerDTO(
-        id: i + 1,
-        name: 'John Doe ${i + 1}',
-        contactNumber: '98${(10000000 + i).toString().padLeft(7, '0')}',
-        email: 'john${i + 1}@example.com',
-        address: 'Address ${i + 1}',
       ),
     );
   }
