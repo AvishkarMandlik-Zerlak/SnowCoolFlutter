@@ -6,7 +6,7 @@ import 'package:lottie/lottie.dart';
 
 Widget customLoader() {
   return Container(
-            color: Colors.black.withOpacity(0.6),
+            // color: Colors.black.withOpacity(0.6),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Center(

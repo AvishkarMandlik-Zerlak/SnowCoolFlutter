@@ -1,8 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/create_customer_screen.dart';
+import 'package:snow_trading_cool/screens/home_screen.dart';
 import 'package:snow_trading_cool/services/customer_api.dart';
+import 'package:snow_trading_cool/utils/constants.dart';
+import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import 'package:snow_trading_cool/widgets/drawer.dart';
+import 'package:snow_trading_cool/widgets/loader.dart';
 
 class ViewCustomerScreenFixed extends StatefulWidget {
   const ViewCustomerScreenFixed({super.key});
@@ -30,6 +36,7 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
+    _loadUserRole();
   }
 
   @override
@@ -192,35 +199,74 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
     }
   }
 
+  String _userRole = 'Employee';
+
+  void _loadUserRole() {
+    final savedRole = TokenManager().getRole();
+    _userRole = (savedRole?.toUpperCase() == 'ADMIN') ? 'ADMIN' : 'Employee';
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    bool isAdmin = _userRole == 'ADMIN';
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('View Customers'),
-         actions: [
+        title: Text(
+          'View Customers',
+          style: GoogleFonts.inter(color: Colors.white),
+        ),
+        leadingWidth: 96,
+        leading: Row(
+          children: [
+            Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: Icon(Icons.menu), // color: Colors.black),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                );
+              },
+            ),
+
+            if (isAdmin)
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                },
+                icon: Icon(Icons.home),
+              ),
+          ],
+        ),
+        actions: [
           GestureDetector(
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const CreateCustomerScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const CreateCustomerScreen(),
+                ),
               );
             },
             child: Container(
               height: 30,
-              width: 110,
+              // width: 110,
+              padding: EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: const Color.fromRGBO(0, 140, 192, 1),
+                // color: const Color.fromRGBO(0, 140, 192, 1),
+                color: Colors.white,
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   "Create Customer",
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accentBlue,
                   ),
                 ),
               ),
@@ -229,298 +275,300 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
         ],
         actionsPadding: const EdgeInsets.symmetric(horizontal: 12),
       ),
+      drawer: ShowSideMenu(),
       body: RefreshIndicator(
         onRefresh: () => _fetchCustomers(page: _currentPage),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: const EdgeInsets.only(bottom: 0),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: Column(
-                          children: [
-                            // 🔍 Search box
-                            Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Wrap(
-                                spacing: 10,
-                                runSpacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: isMobile ? screenWidth - 32 : 250,
-                                    child: TextField(
-                                      controller: _searchController,
-                                      decoration: const InputDecoration(
-                                        prefixIcon: Icon(Icons.search),
-                                        labelText:
-                                            'Search by name, contact, or email',
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            Row(
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 0),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          // 🔍 Search box
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Wrap(
+                              spacing: 10,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Column(
-                                  children: [
-                                    Container(
-                                      height: 50,
-                                      color: Colors.grey.shade50,
-                                      child: const Center(
-                                        child: Text(
-                                          'Name',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            color: Color.fromRGBO(
-                                              0,
-                                              140,
-                                              192,
-                                              1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    ..._filteredData.map((row) {
-                                      return Container(
-                                        height: 50,
-                                        decoration: BoxDecoration(
-                                          border: Border(
-                                            bottom: BorderSide(
-                                              color: Colors.grey.shade300,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                            ),
-                                            child: Text(row['name'] ?? 'N/A'),
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-
-                                // Data columns
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: SizedBox(
-                                      width: 700,
-                                      child: Column(
-                                        children: [
-                                          // Header
-                                          Container(
-                                            height: 50,
-                                            color: Colors.grey.shade50,
-                                            child: const Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: 150,
-                                                  child: Center(
-                                                    child: Text(
-                                                      'Mobile Number',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color.fromRGBO(
-                                                          0,
-                                                          140,
-                                                          192,
-                                                          1,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  width: 200,
-                                                  child: Center(
-                                                    child: Text(
-                                                      'Email',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color.fromRGBO(
-                                                          0,
-                                                          140,
-                                                          192,
-                                                          1,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  width: 200,
-                                                  child: Center(
-                                                    child: Text(
-                                                      'Address',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color.fromRGBO(
-                                                          0,
-                                                          140,
-                                                          192,
-                                                          1,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                SizedBox(
-                                                  width: 150,
-                                                  child: Center(
-                                                    child: Text(
-                                                      'Actions',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color.fromRGBO(
-                                                          0,
-                                                          140,
-                                                          192,
-                                                          1,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-
-                                          // Rows
-                                          ..._filteredData.map((row) {
-                                            return Container(
-                                              height: 50,
-                                              decoration: BoxDecoration(
-                                                border: Border(
-                                                  bottom: BorderSide(
-                                                    color: Colors.grey.shade300,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  SizedBox(
-                                                    width: 150,
-                                                    child: Center(
-                                                      child: Text(
-                                                        row['contactNumber'] ??
-                                                            'N/A',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(
-                                                    width: 200,
-                                                    child: Center(
-                                                      child: Text(
-                                                        row['email'] ?? 'N/A',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(
-                                                    width: 200,
-                                                    child: Center(
-                                                      child: Text(
-                                                        row['address'] ?? 'N/A',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(
-                                                    width: 150,
-                                                    child: Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        IconButton(
-                                                         icon: Icon(
-                                                              CupertinoIcons.square_pencil_fill, color: Color.fromRGBO(
-                                                                0,
-                                                                140,
-                                                                192,
-                                                                1,
-                                                              ),
-                                                            ),
-                                                          onPressed: () =>
-                                                              _editCustomer(
-                                                                row,
-                                                              ),
-                                                        ),
-                                                        IconButton(
-                                                          icon: Icon(
-                                                              CupertinoIcons.bin_xmark_fill, color: Colors.red
-                                                            ),
-                                                          onPressed: () {
-                                                            final id =
-                                                                int.tryParse(
-                                                                  row['id']
-                                                                      .toString(),
-                                                                ) ??
-                                                                0;
-                                                            _deleteCustomer(id);
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }),
-                                        ],
-                                      ),
+                                SizedBox(
+                                  width: isMobile ? screenWidth - 32 : 250,
+                                  child: TextField(
+                                    controller: _searchController,
+                                    decoration: const InputDecoration(
+                                      prefixIcon: Icon(Icons.search),
+                                      labelText:
+                                          'Search by name, contact, or email',
+                                      border: OutlineInputBorder(),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Pagination footer (no extra space below)
-                    Container(
-                      color: const Color(0xFFB3E0F2),
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios),
-                            onPressed: _currentPage > 0
-                                ? () => _fetchCustomers(page: _currentPage - 1)
-                                : null,
                           ),
-                          Text('Page ${_currentPage + 1} of $_totalPages'),
-                          IconButton(
-                            icon: const Icon(Icons.arrow_forward_ios),
-                            onPressed: _currentPage < _totalPages - 1
-                                ? () => _fetchCustomers(page: _currentPage + 1)
-                                : null,
+
+                          Row(
+                            children: [
+                              Column(
+                                children: [
+                                  Container(
+                                    height: 50,
+                                    color: Colors.grey.shade50,
+                                    child: const Center(
+                                      child: Text(
+                                        'Name',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Color.fromRGBO(0, 140, 192, 1),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  ..._filteredData.map((row) {
+                                    return Container(
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          child: Text(row['name'] ?? 'N/A'),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+
+                              // Data columns
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: SizedBox(
+                                    width: 700,
+                                    child: Column(
+                                      children: [
+                                        // Header
+                                        Container(
+                                          height: 50,
+                                          color: Colors.grey.shade50,
+                                          child: const Row(
+                                            children: [
+                                              SizedBox(
+                                                width: 150,
+                                                child: Center(
+                                                  child: Text(
+                                                    'Mobile Number',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color.fromRGBO(
+                                                        0,
+                                                        140,
+                                                        192,
+                                                        1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 200,
+                                                child: Center(
+                                                  child: Text(
+                                                    'Email',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color.fromRGBO(
+                                                        0,
+                                                        140,
+                                                        192,
+                                                        1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 200,
+                                                child: Center(
+                                                  child: Text(
+                                                    'Address',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color.fromRGBO(
+                                                        0,
+                                                        140,
+                                                        192,
+                                                        1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 150,
+                                                child: Center(
+                                                  child: Text(
+                                                    'Actions',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color.fromRGBO(
+                                                        0,
+                                                        140,
+                                                        192,
+                                                        1,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Rows
+                                        ..._filteredData.map((row) {
+                                          return Container(
+                                            height: 50,
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                bottom: BorderSide(
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 150,
+                                                  child: Center(
+                                                    child: Text(
+                                                      row['contactNumber'] ??
+                                                          'N/A',
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 200,
+                                                  child: Center(
+                                                    child: Text(
+                                                      row['email'] ?? 'N/A',
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 200,
+                                                  child: Center(
+                                                    child: Text(
+                                                      row['address'] ?? 'N/A',
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 150,
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      IconButton(
+                                                        icon: Icon(
+                                                          CupertinoIcons
+                                                              .square_pencil_fill,
+                                                          color: Color.fromRGBO(
+                                                            0,
+                                                            140,
+                                                            192,
+                                                            1,
+                                                          ),
+                                                        ),
+                                                        onPressed: () =>
+                                                            _editCustomer(row),
+                                                      ),
+                                                      IconButton(
+                                                        icon: Icon(
+                                                          CupertinoIcons
+                                                              .bin_xmark_fill,
+                                                          color: Colors.red,
+                                                        ),
+                                                        onPressed: () {
+                                                          final id =
+                                                              int.tryParse(
+                                                                row['id']
+                                                                    .toString(),
+                                                              ) ??
+                                                              0;
+                                                          _deleteCustomer(id);
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  // Pagination footer (no extra space below)
+                  Container(
+                    color: const Color(0xFFB3E0F2),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back_ios),
+                          onPressed: _currentPage > 0
+                              ? () => _fetchCustomers(page: _currentPage - 1)
+                              : null,
+                        ),
+                        Text('Page ${_currentPage + 1} of $_totalPages'),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward_ios),
+                          onPressed: _currentPage < _totalPages - 1
+                              ? () => _fetchCustomers(page: _currentPage + 1)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            if (_isLoading) customLoader(),
+          ],
+        ),
       ),
     );
   }

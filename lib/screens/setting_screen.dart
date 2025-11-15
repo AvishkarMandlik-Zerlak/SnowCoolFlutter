@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
+import 'package:snow_trading_cool/screens/home_screen.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import 'package:snow_trading_cool/widgets/drawer.dart';
 import '../services/application_settings_api.dart';
 import '../utils/token_manager.dart';
 
@@ -53,6 +55,7 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
   void initState() {
     super.initState();
     _initApi();
+    _loadUserRole();
   }
 
   Future<void> _initApi() async {
@@ -250,18 +253,53 @@ class _ProfileApplicationSettingScreenState extends State<ProfileApplicationSett
     super.dispose();
   }
 
+   String _userRole = 'Employee';
+
+  void _loadUserRole() {
+    final savedRole = TokenManager().getRole();
+    _userRole = (savedRole?.toUpperCase() == 'ADMIN') ? 'ADMIN' : 'Employee';
+    setState(() {});
+  }
+
+
   @override
   Widget build(BuildContext context) {
     const blueColor = Color.fromRGBO(0, 140, 192, 1);
+        bool isAdmin = _userRole == 'ADMIN';
+
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text("Application Settings"),
-        titleTextStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: blueColor),
-        backgroundColor: Colors.white,
+        titleTextStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+        // backgroundColor: Colors.white,
         elevation: 0,
+      leadingWidth: 96,
+        leading: Row(
+          children: [
+            Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: Icon(Icons.menu), // color: Colors.black),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                );
+              },
+            ),
+
+            if (isAdmin)
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => HomeScreen()),
+                  );
+                },
+                icon: Icon(Icons.home),
+              ),
+          ],
+        ),
       ),
+      drawer: ShowSideMenu(),
       body: Stack(
         children: [
           SingleChildScrollView(

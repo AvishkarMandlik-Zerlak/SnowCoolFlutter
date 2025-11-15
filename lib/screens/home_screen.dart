@@ -115,10 +115,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          if (canManageProfiles && isAdmin)
+          if (canManageProfiles || isAdmin)
             Padding(
               padding: EdgeInsets.only(right: isMobile ? 8 : 12),
               child: PopupMenuButton<String>(
+                color: Colors.white,
                 icon: CircleAvatar(
                   radius: isMobile ? 16 : 18,
                   backgroundColor: Colors.grey.shade300,
@@ -143,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 },
                 itemBuilder: (_) => [
-                  if (canManageProfiles)
+                  if (canManageProfiles || isAdmin)
                     const PopupMenuItem(
                       value: 'profile',
                       child: ListTile(
@@ -251,8 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () {
                 setState(() {
                   log(canCreateCustomers.toString());
-                  if (canCreateCustomers) {
-                    
+                  if (canCreateCustomers || isAdmin) {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const ViewCustomerScreenFixed(),
@@ -311,65 +311,63 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: sectionGap),
             const Divider(height: 1, color: Color(0xFFE0E0E0)),
             SizedBox(height: sectionGap),
-            Text(
-              'Orders/Challans',
-              style: GoogleFonts.inter(
-                fontSize: titleFontSize,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF515151),
-                // color: Colors.white,
+            if (canManageChallans || isAdmin)
+              Text(
+                'Orders/Challans',
+                style: GoogleFonts.inter(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF515151),
+                  // color: Colors.white,
+                ),
               ),
-            ),
             SizedBox(height: verticalGap),
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (canManageChallans) {
+            if (canManageChallans || isAdmin)
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) =>
                                 const ViewChallanScreen(type: "received"),
                           ),
                         );
-                      }
-                    },
-                    child: _buildOrderCard(
-                      '1000',
-                      'Received',
-                      orderCountFontSize,
-                      orderLabelFontSize,
-                      cardRadius,
-                      isMobile,
+                      },
+                      child: _buildOrderCard(
+                        '1000',
+                        'Received',
+                        orderCountFontSize,
+                        orderLabelFontSize,
+                        cardRadius,
+                        isMobile,
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: isMobile ? 10 : 14),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (canManageChallans) {
+                  SizedBox(width: isMobile ? 10 : 14),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) =>
                                 const ViewChallanScreen(type: "Delivered"),
                           ),
                         );
-                      }
-                    },
-                    child: _buildOrderCard(
-                      '1000',
-                      'Delivered',
-                      orderCountFontSize,
-                      orderLabelFontSize,
-                      cardRadius,
-                      isMobile,
+                      },
+                      child: _buildOrderCard(
+                        '1000',
+                        'Delivered',
+                        orderCountFontSize,
+                        orderLabelFontSize,
+                        cardRadius,
+                        isMobile,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ),

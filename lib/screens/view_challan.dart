@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
@@ -8,9 +9,12 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:snow_trading_cool/screens/challan_screen.dart';
+import 'package:snow_trading_cool/screens/home_screen.dart';
 // import 'package:snow_trading_cool/screens/passbook.dart';
 import 'package:snow_trading_cool/services/challan_api.dart';
 import 'package:intl/intl.dart';
+import 'package:snow_trading_cool/utils/constants.dart';
+import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
 import 'package:snow_trading_cool/widgets/drawer.dart';
 import 'package:snow_trading_cool/widgets/loader.dart';
@@ -453,8 +457,19 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
         _selectedType = 'Delivered';
       }
     }
+    _loadUserRole();
     _fetchChallans();
   }
+
+    String _userRole = 'Employee';
+
+   void _loadUserRole() {
+    final savedRole = TokenManager().getRole();
+    _userRole = (savedRole?.toUpperCase() == 'ADMIN') ? 'ADMIN' : 'Employee';
+    setState(() {});
+  }
+
+
 
   Future<void> _fetchChallans() async {
     setState(() => _isLoading = true);
@@ -507,16 +522,38 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
   @override
   Widget build(BuildContext context) {
     final totalPages = (_filteredCustomers.length / _rowsPerPage).ceil();
+        bool isAdmin = _userRole == 'ADMIN';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Challan Details'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Icon(Icons.menu, color: Colors.black),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        title: Text(
+          'Challan Details',
+          style: GoogleFonts.inter(color: Colors.white),
         ),
+        leadingWidth: 96,
+        leading: Row(
+          children: [
+            Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: Icon(Icons.menu), // color: Colors.black),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                );
+              }
+            ),
+
+            if (isAdmin)
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                );
+              },
+              icon: Icon(Icons.home),
+            ),
+          ],
+        ),
+
         actions: [
           GestureDetector(
             onTap: () {
@@ -525,11 +562,13 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
               );
             },
             child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8),
               height: 30,
               width: 110,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: const Color.fromRGBO(0, 140, 192, 1),
+                color: Colors.white,
+                // color: const Color.fromRGBO(0, 140, 192, 1),
               ),
               child: const Center(
                 child: Text(
@@ -537,16 +576,20 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                    color: AppColors.accentBlue,
                   ),
                 ),
               ),
             ),
           ),
+
+          // TextButton(onPressed: (){}, child: Text("Add challan", style: GoogleFonts.inter(color: AppColors.accentBlue),), style: ButtonStyle(backgroundColor: WidgetStatePropertyAll(Colors.white),),),
+
+          // IconButton(onPressed: (){}, icon: Icon(Icons.add_circle_outline))
         ],
         actionsPadding: const EdgeInsets.symmetric(horizontal: 12),
       ),
-       drawer: ShowSideMenu(),
+      drawer: ShowSideMenu(),
       body: RefreshIndicator(
         onRefresh: _fetchChallans,
         child: Stack(
@@ -583,6 +626,8 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                               ),
                               DropdownButton<String>(
                                 value: _selectedType,
+                                hint: Text("Type"),
+                                icon: Icon(Icons.filter_list),
                                 items: ['All', 'Received', 'Delivered']
                                     .map(
                                       (e) => DropdownMenuItem(

@@ -25,19 +25,31 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
   final LogoutApi _logoutApi = LogoutApi();
 
   bool _isLoggingOut = false;
-  // String _userRole = 'Employee';
   bool _showCustomerSubMenu = false;
   bool _showChallanSubMenu = false;
+  String _userRole = 'Employee';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  void _loadUserRole() {
+    final savedRole = TokenManager().getRole();
+    _userRole = (savedRole?.toUpperCase() == 'ADMIN') ? 'ADMIN' : 'Employee';
+    print('User Role Loaded: $_userRole');
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
+    bool isAdmin = _userRole == 'ADMIN';
     bool canManageSettings = TokenManager().canManageSettings;
     bool canManagePassbook = TokenManager().canManagePassbook;
     bool canManageCustomers = TokenManager().canCreateCustomers;
     bool canManageChallans = TokenManager().canManageChallans;
     bool canManageGoodsItems = TokenManager().canManageGoodsItems;
-
-    // String _userRole = 'Employee';
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
@@ -152,20 +164,20 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (canManageChallans)
-                                  ListTile(
-                                    title: const Text('Challan'),
-                                    trailing: Icon(
-                                      _showChallanSubMenu
-                                          ? Icons.remove
-                                          : Icons.add,
-                                      color: const Color(0xFF008CC0),
+                                  if (canManageChallans || isAdmin)
+                                    ListTile(
+                                      title: const Text('Challan'),
+                                      trailing: Icon(
+                                        _showChallanSubMenu
+                                            ? Icons.remove
+                                            : Icons.add,
+                                        color: const Color(0xFF008CC0),
+                                      ),
+                                      onTap: () => setStateDialog(
+                                        () => _showChallanSubMenu =
+                                            !_showChallanSubMenu,
+                                      ),
                                     ),
-                                    onTap: () => setStateDialog(
-                                      () => _showChallanSubMenu =
-                                          !_showChallanSubMenu,
-                                    ),
-                                  ),
                                   if (_showChallanSubMenu) ...[
                                     _subMenu('Create Challan', () {
                                       Navigator.pop(context);
@@ -186,20 +198,20 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
                                     }),
                                   ],
                                   const Divider(height: 1),
-                                  if (canManageCustomers)
-                                  ListTile(
-                                    title: const Text('Customers'),
-                                    trailing: Icon(
-                                      _showCustomerSubMenu
-                                          ? Icons.remove
-                                          : Icons.add,
-                                      color: const Color(0xFF008CC0),
+                                  if (canManageCustomers || isAdmin)
+                                    ListTile(
+                                      title: const Text('Customers'),
+                                      trailing: Icon(
+                                        _showCustomerSubMenu
+                                            ? Icons.remove
+                                            : Icons.add,
+                                        color: const Color(0xFF008CC0),
+                                      ),
+                                      onTap: () => setStateDialog(
+                                        () => _showCustomerSubMenu =
+                                            !_showCustomerSubMenu,
+                                      ),
                                     ),
-                                    onTap: () => setStateDialog(
-                                      () => _showCustomerSubMenu =
-                                          !_showCustomerSubMenu,
-                                    ),
-                                  ),
                                   if (_showCustomerSubMenu) ...[
                                     _subMenu('Create Customer', () {
                                       Navigator.pop(context);
@@ -221,32 +233,32 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
                                     }),
                                   ],
                                   const Divider(height: 1),
-                                  if(canManagePassbook)
-                                  ListTile(
-                                    title: const Text('View Passbook'),
-                                    trailing: const Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Color(0xFF008CC0),
+                                  if (canManagePassbook || isAdmin)
+                                    ListTile(
+                                      title: const Text('View Passbook'),
+                                      trailing: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        color: Color(0xFF008CC0),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => PassBookScreen(),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => PassBookScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
                                   const Divider(height: 1),
-                                  if (canManageGoodsItems)
+                                  if (canManageGoodsItems || isAdmin)
                                     ListTile(
                                       tileColor: Colors.white,
                                       // enabled: isAdmin,
                                       title: Text('Items/Goods'),
-                                       trailing: const Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Color(0xFF008CC0),
-                                    ),
+                                      trailing: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        color: Color(0xFF008CC0),
+                                      ),
                                       onTap: () {
                                         Navigator.pop(context);
                                         Navigator.of(context).push(
@@ -288,34 +300,16 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
                                   ),
                                 ),
                                 // Settings - conditional based on mode
-                                if (canManageSettings)
-                                if (isMobile)
-                                  // Mobile: Only icon
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.settings,
-                                      size: 28,
-                                      color: Colors.black,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => const ProfileScreen(),
-                                        ),
-                                      );
-                                    },
-                                  )
-                                else
-                                  // Tablet: Full ListTile with text
-                                  Expanded(
-                                    child: ListTile(
-                                      leading: const Icon(
+                                if (canManageSettings || isAdmin)
+                                  if (isMobile)
+                                    // Mobile: Only icon
+                                    IconButton(
+                                      icon: const Icon(
                                         Icons.settings,
+                                        size: 28,
                                         color: Colors.black,
                                       ),
-                                      title: const Text('Settings'),
-                                      onTap: () {
+                                      onPressed: () {
                                         Navigator.pop(context);
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
@@ -324,8 +318,27 @@ class _ShowSideMenuState extends State<ShowSideMenu> {
                                           ),
                                         );
                                       },
+                                    )
+                                  else
+                                    // Tablet: Full ListTile with text
+                                    Expanded(
+                                      child: ListTile(
+                                        leading: const Icon(
+                                          Icons.settings,
+                                          color: Colors.black,
+                                        ),
+                                        title: const Text('Settings'),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const ProfileScreen(),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
                               ],
                             ),
                           ),

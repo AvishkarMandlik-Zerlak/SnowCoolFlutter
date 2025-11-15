@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/services/user_api.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import 'package:snow_trading_cool/widgets/loader.dart';
 import '../services/view_user_api.dart';
 import '../models/user_model.dart';
 import 'user_create_screen.dart';
@@ -82,7 +83,6 @@ class _UserViewScreenState extends State<UserViewScreen> {
             user.active = newStatus;
           });
           showSuccessToast(context, "User status updated successfully!");
-          
         }
       } else {
         if (mounted) {
@@ -209,13 +209,6 @@ class _UserViewScreenState extends State<UserViewScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -234,38 +227,48 @@ class _UserViewScreenState extends State<UserViewScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.only(
-          left: isMobile ? 16 : 24,
-          right: isMobile ? 16 : 24,
-          top: 16,
-          bottom: 80,
-        ),
-        child: _users.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.people_outline, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No users found',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey,
-                      ),
+      body: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(
+              left: isMobile ? 16 : 24,
+              right: isMobile ? 16 : 24,
+              top: 16,
+              bottom: 80,
+            ),
+            child: _users.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No users found',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              )
-            : ListView.builder(
-                itemCount: _users.length,
-                itemBuilder: (context, index) {
-                  final user = _users[index];
-                  return _buildUserCard(user, isMobile);
-                },
-              ),
+                  )
+                : ListView.builder(
+                    itemCount: _users.length,
+                    itemBuilder: (context, index) {
+                      final user = _users[index];
+                      return _buildUserCard(user, isMobile);
+                    },
+                  ),
+          ),
+
+          if (_isLoading) customLoader(),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddUser,
@@ -301,6 +304,14 @@ class _UserViewScreenState extends State<UserViewScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade300, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
@@ -360,73 +371,60 @@ class _UserViewScreenState extends State<UserViewScreen> {
                   ),
                 ),
                 // Overflow menu
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.black54),
+                  tooltip: 'More options',
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Colors.black54),
-                    tooltip: 'More options',
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  onSelected: (value) {
+                    if (value == 'edit') _editUser(user);
+                    if (value == 'delete') _deleteUser(user);
+                  },
+                  itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.manage_accounts,
+                            color: Color(0xFF1976D2),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Edit',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    onSelected: (value) {
-                      if (value == 'edit') _editUser(user);
-                      if (value == 'delete') _deleteUser(user);
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.manage_accounts,
-                              color: Color(0xFF1976D2),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Edit',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.person_remove,
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.person_remove,
+                            color: Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Delete',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                               color: Colors.red,
-                              size: 18,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Delete',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),

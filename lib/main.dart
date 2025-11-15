@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart'; // Core Flutter library for building UIs.
 import 'package:snow_trading_cool/dev_utils.dart';
+import 'package:snow_trading_cool/utils/constants.dart';
 import 'screens/login_screen.dart'; // Import the login screen for navigation.
 
 void main() {
@@ -21,6 +22,15 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         // App-wide theme - Sets colors, fonts, etc. for consistency.
         primarySwatch: Colors.blue, // Primary color scheme based on blue.
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppColors.accentBlue,
+          iconTheme: IconThemeData(
+            color: Colors.white,
+          ),
+          actionsIconTheme: IconThemeData(
+            color: Colors.white,
+          ),
+        )
       ),
       home:
           const LoginScreen(), // Sets LoginScreen as the initial route/home page.

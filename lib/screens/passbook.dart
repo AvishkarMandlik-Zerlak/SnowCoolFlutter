@@ -14,7 +14,7 @@ class _PassBookScreenState extends State<PassBookScreen> {
   List<Map<String, dynamic>> _filteredStock = [];
   List<Map<String, dynamic>> _paginatedStock = [];
 
-  int _rowsPerPage = 10;
+  final int _rowsPerPage = 10;
   int _currentPage = 0;
   String _searchQuery = '';
 

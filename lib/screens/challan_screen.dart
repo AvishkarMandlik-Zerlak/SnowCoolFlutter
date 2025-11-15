@@ -6,7 +6,9 @@ import 'package:snow_trading_cool/screens/view_challan.dart';
 import 'package:snow_trading_cool/services/challan_api.dart';
 import 'package:snow_trading_cool/services/customer_api.dart';
 import 'package:snow_trading_cool/services/goods_api.dart';
+import 'package:snow_trading_cool/utils/constants.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import 'package:snow_trading_cool/widgets/loader.dart';
 
 class ChallanScreen extends StatefulWidget {
   final Map<String, dynamic>? challanData;
@@ -397,12 +399,30 @@ class _ChallanScreenState extends State<ChallanScreen> {
         _emailError = null;
       } else if (trimmed != trimmed.toLowerCase()) {
         _emailError = 'Email must be in lowercase';
-      } else if (RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(trimmed)) {
+      } else if (RegExp(
+        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+      ).hasMatch(trimmed)) {
         _emailError = null;
       } else {
         _emailError = 'Enter a valid email address';
       }
     });
+  }
+
+  bool isFormValid() {
+    for (var g in goods) {
+      final qty = _qtyControllers[g.name]!.text.trim();
+      final sr = _srNoControllers[g.name]!.text.trim();
+
+      final qtyNum = int.tryParse(qty) ?? 0;
+      final srNum = int.tryParse(sr) ?? 0;
+
+      final qtyFilled = qtyNum > 0;
+      final srFilled = srNum > 0;
+
+      if (qtyFilled != srFilled) return false; // One filled, other not
+    }
+    return true;
   }
 
   Future<void> _saveChallanData() async {
@@ -506,11 +526,13 @@ class _ChallanScreenState extends State<ChallanScreen> {
       setState(() => _saving = false);
       return;
     }
-    if (customerEmail.isNotEmpty && customerEmail != customerEmail.toLowerCase()) {
+    if (customerEmail.isNotEmpty &&
+        customerEmail != customerEmail.toLowerCase()) {
       _showError('Email must be in lowercase');
       setState(() => _saving = false);
       return;
     }
+    isFormValid();
 
     final List<Map<String, dynamic>> items = [];
     for (final g in goods) {
@@ -668,7 +690,8 @@ class _ChallanScreenState extends State<ChallanScreen> {
         titleTextStyle: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: Color.fromRGBO(0, 140, 192, 1),
+          // color: Color.fromRGBO(0, 140, 192, 1),
+          color: Colors.white,
         ),
       ),
       body: GestureDetector(
@@ -676,118 +699,121 @@ class _ChallanScreenState extends State<ChallanScreen> {
           _removeOverlay();
           FocusScope.of(context).unfocus();
         },
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : Padding(
-                padding: padding,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildCustomerSearchField(),
-                            const SizedBox(height: 12),
-                            _buildChallanTypeRow(),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Date",
-                              controller: dateController,
-                              hint: "Auto-filled (yyyy-MM-dd)",
-                              enabled: true,
-                              prefixIcon: const Icon(Icons.calendar_month),
-                              onTap: () async {
-                                final DateTime? pickedDate =
-                                    await showDatePicker(
-                                      context: context,
-                                      initialDate: DateTime.now(),
-                                      firstDate: DateTime(2000),
-                                      lastDate: DateTime(2100),
+        child: Stack(
+          children: [
+            Padding(
+              padding: padding,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildCustomerSearchField(),
+                          const SizedBox(height: 12),
+                          _buildChallanTypeRow(),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Date",
+                            controller: dateController,
+                            hint: "Auto-filled (yyyy-MM-dd)",
+                            enabled: true,
+                            prefixIcon: const Icon(Icons.calendar_month),
+                            onTap: () async {
+                              final DateTime? pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2100),
+                              );
+                              if (pickedDate != null) {
+                                dateController.text = "${pickedDate.toLocal()}"
+                                    .split(' ')[0];
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Customer Address",
+                            controller: locationController,
+                            hint: "Enter customer address (Location)",
+                            enabled: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Vehicle Number",
+                            controller: vehicleNumberController,
+                            hint: "e.g., MH12AB1234 or 22BH1234AA",
+                            onChanged: _validateVehicleNumber,
+                            errorText: _vehicleNumberError,
+                            enabled: true,
+                            inputFormatters: [UpperCaseTextFormatter()],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Transporter",
+                            controller: transporterController,
+                            hint: "Enter Transporter Details",
+                            enabled: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Driver Details",
+                            controller: vehicleDriverDetailsController,
+                            hint: "e.g., Name - 9876543210",
+                            onChanged: _validateDriverDetails,
+                            errorText: _driverDetailsError,
+                            enabled: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "Mobile Number",
+                            controller: mobileNumberController,
+                            hint: "e.g., 9876543210 (starts with 5–9)",
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(10),
+                            ],
+                            onChanged: _validateMobileNumber,
+                            errorText: _mobileNumberError,
+                            enabled: true,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildLabeledField(
+                            label: "E-Mail",
+                            controller: customerEmailController,
+                            hint: "e.g., example@domain.com (lowercase only)",
+                            enabled: true,
+                            keyboardType: TextInputType.emailAddress,
+                            onChanged: (value) {
+                              final lower = value.toLowerCase();
+                              if (value != lower) {
+                                customerEmailController.text = lower;
+                                customerEmailController.selection =
+                                    TextSelection.fromPosition(
+                                      TextPosition(offset: lower.length),
                                     );
-                                if (pickedDate != null) {
-                                  dateController.text =
-                                      "${pickedDate.toLocal()}".split(' ')[0];
-                                }
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Customer Address",
-                              controller: locationController,
-                              hint: "Enter customer address (Location)",
-                              enabled: true,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Vehicle Number",
-                              controller: vehicleNumberController,
-                              hint: "e.g., MH12AB1234 or 22BH1234AA",
-                              onChanged: _validateVehicleNumber,
-                              errorText: _vehicleNumberError,
-                              enabled: true,
-                              inputFormatters: [UpperCaseTextFormatter()],
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Transporter",
-                              controller: transporterController,
-                              hint: "Enter Transporter Details",
-                              enabled: true,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Driver Details",
-                              controller: vehicleDriverDetailsController,
-                              hint: "e.g., Name - 9876543210",
-                              onChanged: _validateDriverDetails,
-                              errorText: _driverDetailsError,
-                              enabled: true,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "Mobile Number",
-                              controller: mobileNumberController,
-                              hint: "e.g., 9876543210 (starts with 5–9)",
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
-                              ],
-                              onChanged: _validateMobileNumber,
-                              errorText: _mobileNumberError,
-                              enabled: true,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildLabeledField(
-                              label: "E-Mail",
-                              controller: customerEmailController,
-                              hint: "e.g., example@domain.com (lowercase only)",
-                              enabled: true,
-                              keyboardType: TextInputType.emailAddress,
-                              onChanged: (value) {
-                                final lower = value.toLowerCase();
-                                if (value != lower) {
-                                  customerEmailController.text = lower;
-                                  customerEmailController.selection =
-                                      TextSelection.fromPosition(
-                                    TextPosition(offset: lower.length),
-                                  );
-                                }
-                                _validateEmail(lower);
-                              },
-                              errorText: _emailError,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildProductTable(),
-                          ],
-                        ),
+                              }
+                              _validateEmail(lower);
+                            },
+                            errorText: _emailError,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProductTable(),
+                        ],
                       ),
                     ),
-                    _buildActionButtons(isEditMode),
-                  ],
-                ),
+                  ),
+                  _buildActionButtons(isEditMode),
+                ],
               ),
+            ),
+
+            if (_loading) customLoader(),
+          ],
+        ),
       ),
     );
   }
@@ -797,7 +823,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Customer Name or Mobile",
+          "Customer Name",
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -822,6 +848,9 @@ class _ChallanScreenState extends State<ChallanScreen> {
               fontSize: 15,
               color: Color.fromRGBO(156, 156, 156, 1),
             ),
+            errorBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.red),
+            ),
             enabledBorder: OutlineInputBorder(
               borderSide: const BorderSide(
                 color: Color.fromRGBO(156, 156, 156, 1),
@@ -829,10 +858,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             focusedBorder: const OutlineInputBorder(
-              borderSide: BorderSide(
-                color: Color.fromRGBO(0, 140, 192, 1),
-                width: 2,
-              ),
+              borderSide: BorderSide(color: AppColors.accentBlue, width: 2),
               borderRadius: BorderRadius.all(Radius.circular(8)),
             ),
             suffixIcon: _isSearching
@@ -844,7 +870,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
                       color: Colors.grey,
                     ),
                   )
-                :const Icon(Icons.search, color: Colors.grey),
+                : const Icon(Icons.search, color: Colors.grey),
           ),
         ),
       ],
@@ -907,8 +933,11 @@ class _ChallanScreenState extends State<ChallanScreen> {
               borderRadius: const BorderRadius.all(Radius.circular(8)),
             ),
             focusedBorder: const OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromRGBO(156, 156, 156, 1)),
+              borderSide: BorderSide(color: AppColors.accentBlue, width: 2),
               borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.red),
             ),
             errorText: errorText,
             errorStyle: const TextStyle(color: Colors.red, fontSize: 12),
@@ -982,14 +1011,7 @@ class _ChallanScreenState extends State<ChallanScreen> {
       );
     }
     if (goods.isEmpty) {
-      return SizedBox(
-        child: Lottie.asset(
-          'assets/lottie/oxygen cylinder.json',
-          width: 150,
-          height: 150,
-          fit: BoxFit.cover,
-        ),
-      );
+      return Text("Goods Not Found");
     }
 
     return Container(
@@ -1047,67 +1069,153 @@ class _ChallanScreenState extends State<ChallanScreen> {
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
         ),
-        _numField(qtyCtrl),
-        _srNoField(srCtrl), // ← Now accepts String
+        _numField(qtyCtrl, srCtrl), // ← Pass srCtrl
+        _srNoField(srCtrl, qtyCtrl), // ← Pass qtyCtrl
       ],
     );
   }
+  
+  Widget _numField(
+    TextEditingController qtyCtrl,
+    TextEditingController srCtrl,
+  ) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        void listener() => setState(() {});
+        qtyCtrl.removeListener(listener);
+        srCtrl.removeListener(listener);
+        qtyCtrl.addListener(listener);
+        srCtrl.addListener(listener);
 
-  Widget _numField(TextEditingController ctrl) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: TextField(
-        controller: ctrl,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(
-          contentPadding: EdgeInsets.all(8),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(
-              color: Color.fromRGBO(238, 238, 238, 1),
-              width: 1.5,
+        final srText = srCtrl.text.trim();
+        final qtyText = qtyCtrl.text.trim();
+
+        final bool srFilled =
+            srText.isNotEmpty &&
+            int.tryParse(srText) != null &&
+            int.tryParse(srText)! > 0;
+        final bool qtyValid =
+            qtyText.isNotEmpty &&
+            int.tryParse(qtyText) != null &&
+            int.tryParse(qtyText)! > 0;
+
+        final bool showError = srFilled && !qtyValid;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: TextField(
+            controller: qtyCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.all(8),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Color.fromRGBO(238, 238, 238, 1),
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.accentBlue, width: 2.0),
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.red.shade400, width: 1.5),
+                borderRadius: const BorderRadius.all(Radius.circular(4)),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.red.shade600, width: 2.0),
+                borderRadius: const BorderRadius.all(Radius.circular(4)),
+              ),
+              errorText: showError ? '' : null,
+              errorStyle: const TextStyle(height: 0, fontSize: 0),
             ),
-            borderRadius: BorderRadius.all(Radius.circular(4)),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(
-              color: Color.fromRGBO(238, 238, 238, 1),
-              width: 2.0,
-            ),
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-          ),
-        ),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-      ),
+        );
+      },
     );
   }
 
-  Widget _srNoField(TextEditingController ctrl) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: TextField(
-        controller: ctrl,
-        keyboardType: TextInputType.text,
-        inputFormatters: [], // ← Allows letters + numbers
-        decoration: const InputDecoration(
-          contentPadding: EdgeInsets.all(8),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(
-              color: Color.fromRGBO(238, 238, 238, 1),
-              width: 1.5,
+  String? _getSrNoErrorText(String value) {
+    // Allow empty
+    if (value.trim().isEmpty) {
+      return null;
+    }
+
+    final int? num = int.tryParse(value);
+    if (num == null) {
+      return 'Invalid number';
+    }
+
+    if (num == 0) {
+      return ''; //'Sr No cannot be 0';
+    }
+
+    return null; // Valid
+  }
+
+  Widget _srNoField(
+    TextEditingController srCtrl,
+    TextEditingController qtyCtrl,
+  ) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        void listener() => setState(() {});
+        srCtrl.removeListener(listener);
+        qtyCtrl.removeListener(listener);
+        srCtrl.addListener(listener);
+        qtyCtrl.addListener(listener);
+
+        final qtyText = qtyCtrl.text.trim();
+        final srText = srCtrl.text.trim();
+
+        final bool qtyFilled =
+            qtyText.isNotEmpty &&
+            int.tryParse(qtyText) != null &&
+            int.tryParse(qtyText)! > 0;
+        final bool srValid =
+            srText.isNotEmpty &&
+            int.tryParse(srText) != null &&
+            int.tryParse(srText)! > 0;
+
+        final bool showError = qtyFilled && !srValid;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: TextField(
+            controller: srCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.all(8),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Color.fromRGBO(238, 238, 238, 1),
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.accentBlue, width: 2.0),
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.red.shade400, width: 1.5),
+                borderRadius: const BorderRadius.all(Radius.circular(4)),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.red.shade600, width: 2.0),
+                borderRadius: const BorderRadius.all(Radius.circular(4)),
+              ),
+              errorText: showError ? '' : null,
+              errorStyle: const TextStyle(height: 0, fontSize: 0),
             ),
-            borderRadius: BorderRadius.all(Radius.circular(4)),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(
-              color: Color.fromRGBO(238, 238, 238, 1),
-              width: 2.0,
-            ),
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-          ),
-        ),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-      ),
+        );
+      },
     );
   }
 

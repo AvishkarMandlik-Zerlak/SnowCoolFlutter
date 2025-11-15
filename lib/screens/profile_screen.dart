@@ -5,6 +5,7 @@ import 'package:snow_trading_cool/screens/setting_screen.dart';
 import 'package:snow_trading_cool/screens/user_create_screen.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
 import 'package:snow_trading_cool/widgets/custom_toast.dart';
+import 'package:snow_trading_cool/widgets/loader.dart';
 import '../services/profile_api.dart';
 import '../services/application_settings_api.dart';
 
@@ -136,13 +137,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -177,57 +171,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 16 : 24,
-            vertical: 16,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                Center(
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey.shade300,
-                    backgroundImage: _logoImage,
-                    child: _logoImage == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.white,
-                          )
-                        : null,
-                  ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 24,
+                vertical: 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Center(
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.grey.shade300,
+                        backgroundImage: _logoImage,
+                        child: _logoImage == null
+                            ? const Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildProfileField(
+                      'Business Name',
+                      _profileData['name'] ?? '',
+                      Icons.person,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProfileField(
+                      'Email',
+                      _profileData['email'] ?? '',
+                      Icons.email,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProfileField(
+                      'Phone',
+                      _profileData['phone'] ?? '',
+                      Icons.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildProfileField(
+                      'Address',
+                      _profileData['address'] ?? '',
+                      Icons.location_on,
+                      isMultiLine: true,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                _buildProfileField(
-                  'Business Name',
-                  _profileData['name'] ?? '',
-                  Icons.person,
-                ),
-                const SizedBox(height: 16),
-                _buildProfileField(
-                  'Email',
-                  _profileData['email'] ?? '',
-                  Icons.email,
-                ),
-                const SizedBox(height: 16),
-                _buildProfileField(
-                  'Phone',
-                  _profileData['phone'] ?? '',
-                  Icons.phone,
-                ),
-                const SizedBox(height: 16),
-                _buildProfileField(
-                  'Address',
-                  _profileData['address'] ?? '',
-                  Icons.location_on,
-                  isMultiLine: true,
-                ),
-                const SizedBox(height: 16),
-              ],
+              ),
             ),
-          ),
+
+            if(_isLoading)
+            customLoader(),          
+          ],
         ),
       ),
     );
