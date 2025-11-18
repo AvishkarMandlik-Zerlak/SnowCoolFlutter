@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:snow_trading_cool/screens/create_customer_screen.dart';
 import 'package:snow_trading_cool/screens/home_screen.dart';
+import 'package:snow_trading_cool/screens/passbook.dart';
 import 'package:snow_trading_cool/services/customer_api.dart';
 import 'package:snow_trading_cool/utils/constants.dart';
 import 'package:snow_trading_cool/utils/token_manager.dart';
@@ -332,22 +333,32 @@ class _ViewCustomerScreenFixedState extends State<ViewCustomerScreenFixed> {
                                     ),
                                   ),
                                   ..._filteredData.map((row) {
-                                    return Container(
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        border: Border(
-                                          bottom: BorderSide(
-                                            color: Colors.grey.shade300,
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                PassBookScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            bottom: BorderSide(
+                                              color: Colors.grey.shade300,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: Text(row['name'] ?? 'N/A'),
                                           ),
-                                          child: Text(row['name'] ?? 'N/A'),
                                         ),
                                       ),
                                     );

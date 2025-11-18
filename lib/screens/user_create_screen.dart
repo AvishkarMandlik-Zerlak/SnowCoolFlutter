@@ -23,10 +23,10 @@ class _UserCreateScreenState extends State<UserCreateScreen> {
   bool _active = true;
   bool _canCreateCustomer = false;
   bool _canManageGoodsItems = false;
-  bool _canManageChallans = false;
+  bool _canManageChallans = true;
   bool _canManageProfiles = false;
   bool _canManageSettings = false;
-  bool _canManagePassbook = false; // ← NEW FIELD
+  bool _canManagePassbook = true;
   bool _showPassword = false;
 
   final UserApi _userApi = UserApi();

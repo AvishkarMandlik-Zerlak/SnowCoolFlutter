@@ -10,6 +10,9 @@ class CustomerDTO {
   final String? address;
   final String contactNumber;
   final String? email;
+  final String? reminder;
+  final double? deposite;
+  final List<Map<String, dynamic>>? items;
 
   CustomerDTO({
     required this.id,
@@ -17,6 +20,9 @@ class CustomerDTO {
     this.address,
     required this.contactNumber,
     this.email,
+    this.reminder,
+    this.deposite,
+    this.items,    
   });
 
   factory CustomerDTO.fromJson(Map<String, dynamic> json) {
@@ -26,6 +32,9 @@ class CustomerDTO {
       address: json['address']?.toString().trim(),
       contactNumber: json['contactNumber']?.toString().trim() ?? '',
       email: json['email']?.toString().trim(),
+      reminder: json['reminder']?.toString().trim(),
+      deposite: _parseDouble(json['deposite']),
+      items: json['items']
     );
   }
 
@@ -33,6 +42,14 @@ class CustomerDTO {
     if (value == null) return 0;
     if (value is int) return value;
     if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
     return 0;
   }
 
@@ -205,16 +222,22 @@ class CustomerApi {
 
   Future<CustomerResponse> createCustomer({
     required String name,
-    required String mobile,
+    required String contactNumber,
     required String email,
     required String address,
+    String? reminder,
+    double? deposite,
+    List<Map<String, dynamic>>? items,
   }) async {
     final url = Uri.parse('${_normalizeBaseUrl()}/api/v1/customers/save');
     final body = jsonEncode({
       'name': name.trim(),
-      'contactNumber': mobile.trim(),
+      'contactNumber': contactNumber.trim(),
       'email': email.trim(),
       'address': address.trim(),
+      'reminder': reminder,
+      'deposite': deposite,
+      'items': items,
     });
     final headers = ApiUtils.getAuthenticatedHeaders();
     final resp = await http
