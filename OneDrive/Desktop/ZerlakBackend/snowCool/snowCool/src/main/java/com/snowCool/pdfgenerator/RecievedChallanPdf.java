@@ -103,6 +103,7 @@ public class RecievedChallanPdf {
                 .setMargin(0)
                 .setPadding(0);
 
+        // LEFT: Transport Details — WIDER (62%)
         Paragraph transportDetails = new Paragraph()
                 .add(new Text("Transport Detail :\n").setFont(bold).setFontSize(9))
                 .add(new Text("Transport : ").setFontSize(9)).add(new Text(safe(challan.getTransporter()) + "\n").setFont(bold).setFontSize(9))
