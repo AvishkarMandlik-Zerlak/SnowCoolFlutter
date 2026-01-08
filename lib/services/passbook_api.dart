@@ -46,8 +46,8 @@ class PassbookApi {
   Future<Map<String, dynamic>> fetchPassbookPage({
     required BuildContext context,
     int? customerId,
-    int page = 0,
-    int size = 7,
+    required int page,
+    required int size,
     String? search,
     String? poSearch,
     String? fromDate,
@@ -214,7 +214,7 @@ class PassbookApi {
     DateTime? fromDate,
     DateTime? toDate,
     int page = 0,
-    int size = 7,
+    required int size,
   }) async {
     // ──────────────────────────────────────
     // Build query parameters
@@ -360,8 +360,8 @@ class PassbookApi {
   Future<Map<String, dynamic>> searchPassbook({
     required BuildContext context,
     required String query,
-    int page = 0,
-    int size = 7,
+    required page,
+    required int size,
   }) async {
     final trimmedQuery = query.trim();
 
@@ -523,8 +523,8 @@ class PassbookApi {
   Future<Map<String, dynamic>> searchByPoOrSite({
     required BuildContext context,
     required String query,
-    int page = 0,
-    int size = 7,
+    required int page,
+    required int size,
   }) async {
     final trimmedQuery = query.trim();
 
@@ -661,116 +661,6 @@ class PassbookApi {
       };
     }
   }
-
-  // Future<Map<String, dynamic>> getPassbookByProductName({
-  //   required BuildContext context,
-  //   required String itemName,
-  //   int page = 0,
-  //   int size = 7,
-  //   DateTime? fromDate,
-  //   DateTime? toDate,
-  // }) async {
-  //   final Map<String, String> params = {
-  //     'page': page.toString(),
-  //     'size': size.toString(),
-  //     'itemName': itemName.trim(),
-  //     if (fromDate != null)
-  //       'fromDate': DateFormat('yyyy-MM-dd').format(fromDate),
-  //     if (toDate != null) 'toDate': DateFormat('yyyy-MM-dd').format(toDate),
-  //   };
-
-  //   final uri = Uri.parse(
-  //     '$baseUrl/api/v1/challans/passbook',
-  //   ).replace(queryParameters: params);
-
-  //   try {
-  //     final response = await http
-  //         .get(uri, headers: _getHeaders())
-  //         .timeout(const Duration(seconds: 25));
-
-  //     if (response.statusCode >= 200 && response.statusCode < 300) {
-  //       final Map<String, dynamic> json = jsonDecode(response.body);
-  //       final List<dynamic> content = json['content'] ?? [];
-
-  //       // Reuse the same transformation logic as searchUnified
-  //       final List<Map<String, dynamic>> transformed = content.map((item) {
-  //         final itemsList = (item['items'] as List?) ?? [];
-  //         final totalDelivered = itemsList.fold<int>(
-  //           0,
-  //           (s, i) => s + ((i['deliveredQty'] as num?)?.toInt() ?? 0),
-  //         );
-  //         final totalReceived = itemsList.fold<int>(
-  //           0,
-  //           (s, i) => s + ((i['receivedQty'] as num?)?.toInt() ?? 0),
-  //         );
-
-  //         final List<Map<String, dynamic>> productSrList = itemsList.map((i) {
-  //           final List<String> srList =
-  //               (i['srNo'] as List?)?.cast<String>() ?? [];
-  //           final String productName =
-  //               i['name']?.toString() ?? 'Unknown Product';
-  //           return {
-  //             'productName': productName,
-  //             'srNos': srList,
-  //             'srNoJoined': srList.join('/'),
-  //           };
-  //         }).toList();
-
-  //         final productType = itemsList.map((i) {
-  //           final String productName =
-  //               i['name']?.toString() ?? 'Unknown Product';
-  //           return {'productName': productName};
-  //         }).toList();
-  //         log("product type : $productType");
-
-  //         return {
-  //           'id': item['id'] ?? '',
-  //           'customerId': item['customerId'] ?? '',
-  //           'challanNumber': item['challanNumber'] ?? 'CH-${item['id']}',
-  //           'productType': productSrList
-  //               .map((p) => p['productName'] as String)
-  //               .toSet() // optional: remove duplicates
-  //               .toList(),
-  //           'purchaseOrderNo': item['purchaseOrderNo'] ?? '',
-  //           'siteLocation': item['siteLocation'] ?? '',
-  //           'customerName': item['customerName'] ?? 'Unknown',
-  //           'receivedChallanNos': item['receivedChallanNos'] ?? '',
-  //           'srNo': productSrList
-  //               .expand((p) => p['srNos'] as List<String>)
-  //               .join('/'),
-  //           'product_sr_details': productSrList,
-  //           'date': item['date'] ?? '',
-  //           'delivered': totalDelivered,
-  //           'received': totalReceived,
-  //           'deposite': (item['deposite'] as num?)?.toDouble() ?? 0.0,
-  //           'returnedAmount':
-  //               (item['returnedAmount'] as num?)?.toDouble() ?? 0.0,
-  //           'raw': item,
-  //         };
-  //       }).toList();
-
-  //       return {
-  //         'content': transformed,
-  //         'totalPages': json['totalPages'] ?? 1,
-  //         'totalElements': json['totalElements'] ?? 0,
-  //         'number': json['number'] ?? page,
-  //         'size': json['size'] ?? size,
-  //         'last': json['last'] ?? true,
-  //       };
-  //     }
-
-  //     final errorMsg = response.body.isNotEmpty
-  //         ? (jsonDecode(response.body)['message'] ?? response.body)
-  //         : "No results found";
-  //     if (context.mounted) showErrorToast(context, errorMsg);
-
-  //     return _emptyPage(page, size);
-  //   } catch (e) {
-  //     debugPrint("getPassbookByProductName error: $e");
-  //     if (context.mounted) showErrorToast(context, "Network error");
-  //     return _emptyPage(page, size);
-  //   }
-  // }
 
   /// Get total count of all delivered challans
   Future<int> getTotalDeliveredCount({required BuildContext context}) async {
